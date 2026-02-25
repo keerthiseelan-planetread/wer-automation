@@ -437,7 +437,7 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     # Display results table
     st.markdown("<h3 style='margin-top: 30px;'>Detailed Results</h3>", unsafe_allow_html=True)
     st.dataframe(df_results, use_container_width=True, hide_index=True)
-    
+
     # Export option
     csv = df_results.to_csv(index=False)
     
@@ -462,6 +462,64 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
             if st.button("✕", key="close_msg_btn", help="Close message"):
                 st.session_state["download_clicked"] = False
                 st.rerun()
-elif generate_clicked:
-    # If generate was clicked but no results found
-    st.warning("⚠️ No matching Original-AI file pairs found. Please check your file naming conventions.")
+            elif generate_clicked:
+                # If generate was clicked but no results found
+                st.warning("⚠️ No matching Original-AI file pairs found. Please check your file naming conventions.")
+
+    
+    # Calculate tool-wise statistics
+    tool_stats = df_results.groupby("AI Tool")["WER Score (%)"].agg(["mean", "min", "max"]).round(2)
+    tool_stats.columns = ["Average WER", "Best Score", "Worst Score"]
+    
+    # Find best and worst performing tools
+    best_tool = tool_stats["Average WER"].idxmin()
+    best_wer = tool_stats.loc[best_tool, "Average WER"]
+    worst_tool = tool_stats["Average WER"].idxmax()
+    worst_wer = tool_stats.loc[worst_tool, "Average WER"]
+    
+    # Display summary metrics
+    st.markdown("<h3 style='margin-top: 30px;'>📊 Performance Summary</h3>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 12px; padding: 20px; text-align: center;">
+            <p style="color: #065f46; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">🏆 Best Performing Tool</p>
+            <p style="color: #047857; font-size: 24px; font-weight: 700; margin: 0;">{best_tool}</p>
+            <p style="color: #059669; font-size: 13px; margin: 8px 0 0 0;">Avg WER: {best_wer}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 12px; padding: 20px; text-align: center;">
+            <p style="color: #991b1b; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">⚠️ Low Performing Tool</p>
+            <p style="color: #dc2626; font-size: 24px; font-weight: 700; margin: 0;">{worst_tool}</p>
+            <p style="color: #b91c1c; font-size: 13px; margin: 8px 0 0 0;">Avg WER: {worst_wer}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); border-radius: 12px; padding: 20px; text-align: center;">
+            <p style="color: #1e40af; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">📈 Total Tools</p>
+            <p style="color: #1e3a8a; font-size: 24px; font-weight: 700; margin: 0;">{len(tool_stats)}</p>
+            <p style="color: #1e40af; font-size: 13px; margin: 8px 0 0 0;">Analyzed</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Display tool-wise average WER table
+    st.markdown("<h3 style='margin-top: 30px;'>Tool-wise WER Metrics</h3>", unsafe_allow_html=True)
+    st.dataframe(tool_stats, use_container_width=True)
+    
+    # Download tool-wise metrics
+    tool_metrics_csv = tool_stats.to_csv()
+    st.download_button(
+        label="📥 Download Tool Metrics as CSV",
+        data=tool_metrics_csv,
+        file_name=f"wer_tool_metrics_{selected_language}_{selected_month}_{selected_year}.csv",
+        mime="text/csv"
+    )
+    
+    

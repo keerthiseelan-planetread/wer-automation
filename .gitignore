@@ -26,3 +26,4 @@ Thumbs.db
 *.json
 service.account.json
 
+app/hash_password.py
