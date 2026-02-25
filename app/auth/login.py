@@ -93,8 +93,13 @@ def login_user():
     col1, col2, col3 = st.columns([1, 1, 1])
     
     with col2:
+        # Display logo centered
+        logo_col1, logo_col2, logo_col3 = st.columns([1, 1, 1])
+        with logo_col2:
+            st.image("app/assets/logo.jpeg", width=100)
+        
         st.markdown("""
-        <div style="text-align: center; margin-bottom: 40px; margin-top: 60px;">
+        <div style="text-align: center; margin-bottom: 40px; margin-top: 20px;">
             <h1 style="color: #1f2937; margin: 0; font-size: 32px;">WER Automation Tool</h1>
             <p style="color: #6b7280; margin-top: 8px; font-size: 16px;">AI Transcription Evaluation & Analysis Platform</p>
         </div>

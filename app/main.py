@@ -202,6 +202,11 @@ if not st.session_state["authenticated"]:
 # SIDEBAR - User Info & Logout
 # ===========================
 with st.sidebar:
+    # Display logo in sidebar
+    sidebar_col1, sidebar_col2, sidebar_col3 = st.columns([1, 1, 1])
+    with sidebar_col2:
+        st.image("app/assets/logo.jpeg", width=180)
+    
     st.markdown("---")
     
     # User profile section
