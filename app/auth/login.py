@@ -116,7 +116,7 @@ def login_user():
         password = st.text_input("🔐 Password", type="password", placeholder="Enter your password")
         
         # Login button
-        if st.button("Sign In", use_container_width=True, key="login_btn"):
+        if st.button("Sign In", width='stretch', key="login_btn"):
             if not email or not password:
                 st.error("Please fill in all fields")
                 return
