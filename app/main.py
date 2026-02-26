@@ -219,7 +219,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     # Logout button
-    if st.button("🚪 Logout", use_container_width=True, key="logout_btn"):
+    if st.button("🚪 Logout", width='stretch', key="logout_btn"):
         logout_user()
     
     st.markdown("---")
@@ -287,7 +287,7 @@ with col3:
 
 with col4:
     st.markdown("<p style='font-size: 12px; color: #6b7280; font-weight: 600;'>Action</p>", unsafe_allow_html=True)
-    generate_clicked = st.button("🔄 Generate Report", use_container_width=True, key="generate_btn")
+    generate_clicked = st.button("🔄 Generate Report", width='stretch', key="generate_btn")
 
 # Processing and results
 if generate_clicked:
@@ -436,15 +436,22 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     selected_month = st.session_state.get("result_month", "")
     selected_year = st.session_state.get("result_year", "")
     
-    import pandas as pd
-    df_results = pd.DataFrame(results)
-    
-    # Display results table
+    # Display results table using Streamlit's native support
     st.markdown("<h3 style='margin-top: 30px;'>Detailed Results</h3>", unsafe_allow_html=True)
-    st.dataframe(df_results, use_container_width=True, hide_index=True)
+    st.dataframe(results, width='stretch', hide_index=True)
 
-    # Export option
-    csv = df_results.to_csv(index=False)
+    # Export option - create CSV from results list
+    import csv
+    import io
+    
+    csv_buffer = io.StringIO()
+    if results:
+        writer = csv.DictWriter(csv_buffer, fieldnames=results[0].keys())
+        writer.writeheader()
+        writer.writerows(results)
+        csv_content = csv_buffer.getvalue()
+    else:
+        csv_content = ""
     
     # Download button with callback
     def mark_download_clicked():
@@ -452,7 +459,7 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     
     st.download_button(
         label="📥 Download Results as CSV" if not st.session_state.get("download_clicked") else "📥 Download Results Again",
-        data=csv,
+        data=csv_content,
         file_name=f"wer_report_{selected_language}_{selected_month}_{selected_year}.csv",
         mime="text/csv",
         on_click=mark_download_clicked
@@ -472,15 +479,36 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
                 st.warning("⚠️ No matching Original-AI file pairs found. Please check your file naming conventions.")
 
     
-    # Calculate tool-wise statistics
-    tool_stats = df_results.groupby("AI Tool")["WER Score (%)"].agg(["mean", "min", "max"]).round(2)
-    tool_stats.columns = ["Average WER", "Best Score", "Worst Score"]
+    # Calculate tool-wise statistics using native Python
+    tool_stats = {}
+    for result in results:
+        tool = result.get("AI Tool", "Unknown")
+        wer_score = result.get("WER Score (%)", 0)
+        
+        if tool not in tool_stats:
+            tool_stats[tool] = []
+        tool_stats[tool].append(wer_score)
+    
+    # Calculate averages, min, max for each tool
+    tool_summary = {}
+    for tool, scores in tool_stats.items():
+        tool_summary[tool] = {
+            "Average WER": round(sum(scores) / len(scores), 2),
+            "Best Score": round(min(scores), 2),
+            "Worst Score": round(max(scores), 2)
+        }
     
     # Find best and worst performing tools
-    best_tool = tool_stats["Average WER"].idxmin()
-    best_wer = tool_stats.loc[best_tool, "Average WER"]
-    worst_tool = tool_stats["Average WER"].idxmax()
-    worst_wer = tool_stats.loc[worst_tool, "Average WER"]
+    if tool_summary:
+        best_tool = min(tool_summary, key=lambda x: tool_summary[x]["Average WER"])
+        best_wer = tool_summary[best_tool]["Average WER"]
+        worst_tool = max(tool_summary, key=lambda x: tool_summary[x]["Average WER"])
+        worst_wer = tool_summary[worst_tool]["Average WER"]
+    else:
+        best_tool = "N/A"
+        best_wer = 0
+        worst_tool = "N/A"
+        worst_wer = 0
     
     # Display summary metrics
     st.markdown("<h3 style='margin-top: 30px;'>📊 Performance Summary</h3>", unsafe_allow_html=True)
@@ -516,10 +544,17 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     
     # Display tool-wise average WER table
     st.markdown("<h3 style='margin-top: 30px;'>Tool-wise WER Metrics</h3>", unsafe_allow_html=True)
-    st.dataframe(tool_stats, use_container_width=True)
     
-    # Download tool-wise metrics
-    tool_metrics_csv = tool_stats.to_csv()
+    # Convert tool_summary dict to list of dicts for proper dataframe display
+    tool_stats_list = [{"AI Tool": tool, **stats} for tool, stats in tool_summary.items()]
+    st.dataframe(tool_stats_list, width='stretch', hide_index=True)
+    
+    # Download tool-wise metrics - create CSV string
+    csv_lines = ["AI Tool,Average WER,Best Score,Worst Score"]
+    for tool, stats in tool_summary.items():
+        csv_lines.append(f"{tool},{stats['Average WER']},{stats['Best Score']},{stats['Worst Score']}")
+    tool_metrics_csv = "\n".join(csv_lines)
+    
     st.download_button(
         label="📥 Download Tool Metrics as CSV",
         data=tool_metrics_csv,
