@@ -431,6 +431,10 @@ if generate_clicked:
 
 # Display persisted results
 if "wer_results" in st.session_state and st.session_state["wer_results"]:
+    # Initialize download state
+    if "download_clicked" not in st.session_state:
+        st.session_state["download_clicked"] = False
+    
     results = st.session_state["wer_results"]
     selected_language = st.session_state.get("result_language", "")
     selected_month = st.session_state.get("result_month", "")
@@ -458,7 +462,7 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
         st.session_state["download_clicked"] = True
     
     st.download_button(
-        label="📥 Download Results as CSV" if not st.session_state.get("download_clicked") else "📥 Download Results Again",
+        label="📥 Download Results as CSV",
         data=csv_content,
         file_name=f"wer_report_{selected_language}_{selected_month}_{selected_year}.csv",
         mime="text/csv",
@@ -467,16 +471,10 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     
     # Show success message after download
     if st.session_state.get("download_clicked"):
-        col1, col2 = st.columns([20, 1])
-        with col1:
-            st.success("✅ Download completed successfully!")
-        with col2:
-            if st.button("✕", key="close_msg_btn", help="Close message"):
-                st.session_state["download_clicked"] = False
-                st.rerun()
-            elif generate_clicked:
-                # If generate was clicked but no results found
-                st.warning("⚠️ No matching Original-AI file pairs found. Please check your file naming conventions.")
+        st.success("✅ Download completed successfully!")
+        if st.button("Clear message", key="clear_download_msg"):
+            st.session_state["download_clicked"] = False
+            st.rerun()
 
     
     # Calculate tool-wise statistics using native Python
