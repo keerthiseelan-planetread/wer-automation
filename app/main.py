@@ -219,7 +219,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     # Logout button
-    if st.button("🚪 Logout", width='stretch', key="logout_btn"):
+    if st.button("🚪 Logout", use_container_width=True, key="logout_btn"):
         logout_user()
     
     st.markdown("---")
@@ -287,7 +287,7 @@ with col3:
 
 with col4:
     st.markdown("<p style='font-size: 12px; color: #6b7280; font-weight: 600;'>Action</p>", unsafe_allow_html=True)
-    generate_clicked = st.button("🔄 Generate Report", width='stretch', key="generate_btn")
+    generate_clicked = st.button("🔄 Generate Report", use_container_width=True, key="generate_btn")
 
 # Processing and results
 if generate_clicked:
@@ -438,7 +438,7 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     
     # Display results table using Streamlit's native support
     st.markdown("<h3 style='margin-top: 30px;'>Detailed Results</h3>", unsafe_allow_html=True)
-    st.dataframe(results, width='stretch', hide_index=True)
+    st.dataframe(results, use_container_width=True, hide_index=True)
 
     # Export option - create CSV from results list
     import csv
@@ -547,7 +547,7 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     
     # Convert tool_summary dict to list of dicts for proper dataframe display
     tool_stats_list = [{"AI Tool": tool, **stats} for tool, stats in tool_summary.items()]
-    st.dataframe(tool_stats_list, width='stretch', hide_index=True)
+    st.dataframe(tool_stats_list, use_container_width=True, hide_index=True)
     
     # Download tool-wise metrics - create CSV string
     csv_lines = ["AI Tool,Average WER,Best Score,Worst Score"]
