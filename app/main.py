@@ -21,6 +21,11 @@ st.set_page_config(
 # Apply custom CSS styling
 st.markdown("""
 <style>
+    /* Hide entire Streamlit header */
+    [data-testid="stHeader"] {
+        display: none !important;
+    }
+    
     /* Hide Streamlit toolbar and header elements */
     [data-testid="stToolbar"] {
         display: none !important;
@@ -35,6 +40,11 @@ st.markdown("""
     }
     
     [data-testid="stDecoration"] {
+        display: none !important;
+    }
+    
+    /* Hide header element */
+    header {
         display: none !important;
     }
     
