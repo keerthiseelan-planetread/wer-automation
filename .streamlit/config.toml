@@ -2,6 +2,7 @@
 showErrorDetails = false
 toolbarMode = "minimal"
 showRunningLoader = false
+showSidebarNavigation = false
 
 [server]
 port = 8501

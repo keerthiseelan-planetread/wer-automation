@@ -21,6 +21,23 @@ st.set_page_config(
 # Apply custom CSS styling
 st.markdown("""
 <style>
+    /* Hide Streamlit toolbar and header elements */
+    [data-testid="stToolbar"] {
+        display: none !important;
+    }
+    
+    .stToolbarActions {
+        display: none !important;
+    }
+    
+    [data-testid="stViewerBadge"] {
+        display: none !important;
+    }
+    
+    [data-testid="stDecoration"] {
+        display: none !important;
+    }
+    
     /* Global styles */
     .stApp {
         background: linear-gradient(to bottom, #f8fafc 0%, #ffffff 100%);
