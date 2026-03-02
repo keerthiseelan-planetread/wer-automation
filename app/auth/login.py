@@ -110,7 +110,7 @@ def login_user():
         # <div style="background: black; border-radius: 12px; padding: 40px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);">
         # """, unsafe_allow_html=True)
         
-        st.markdown("<h2 style='text-align: center; color: #1f2937; margin-top: 0;'>Sign In</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #1f2937; margin-top: 0;'>Welcome Back!</h2>", unsafe_allow_html=True)
         
         email = st.text_input("📧 Email Address", placeholder="Enter your email")
         password = st.text_input("🔐 Password", type="password", placeholder="Enter your password")

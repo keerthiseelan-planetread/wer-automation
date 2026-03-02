@@ -13,7 +13,7 @@ import os
 # Configure page
 st.set_page_config(
     page_title="WER Automation Dashboard",
-    page_icon="📊",
+    # page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -202,11 +202,16 @@ if not st.session_state["authenticated"]:
 # SIDEBAR - User Info & Logout
 # ===========================
 with st.sidebar:
-    # Display logo in sidebar
+    # Add vertical spacing
+    st.markdown("")
+    
+    
+    # Display logo in sidebar centered
     sidebar_col1, sidebar_col2, sidebar_col3 = st.columns([1, 1, 1])
     with sidebar_col2:
-        st.image("app/assets/logo.jpeg", width=180)
+        st.image("app/assets/logo.jpeg", width=100)
     
+    st.markdown("")
     st.markdown("---")
     
     # User profile section
@@ -219,7 +224,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     # Logout button
-    if st.button("🚪 Logout", use_container_width=True, key="logout_btn"):
+    if st.button("Logout", use_container_width=True, key="logout_btn"):
         logout_user()
     
     st.markdown("---")
@@ -227,7 +232,7 @@ with st.sidebar:
     # Info section
     st.markdown("""
     <div style="color: white; font-size: 12px; opacity: 0.8; margin-top: 30px;">
-        <p><strong>📊 WER Automation</strong></p>
+        <p><strong>WER Automation</strong></p>
         <p>Evaluate and compare AI transcription models using comprehensive Word Error Rate metrics.</p>
         <hr style="border-color: rgba(255,255,255,0.2);">
         <p style="font-size: 11px;">Version 1.0 • All Rights Reserved</p>
@@ -259,7 +264,7 @@ if st.session_state.get("show_login_success"):
 # Parameters section
 st.markdown("""
 <div class="param-card">
-        <h2 style="margin-top: 0; color: #1e40af;">⚙️ Analysis Parameters</h2>
+        <h2 style="margin-top: 0; color: #1e40af;">Analysis Parameters</h2>
         <p style="color: #6b7280; margin-bottom: 20px;">Select language, year, and month to view WER scores for all AI tools and compare their transcription accuracy</p>
 </div>
 """, unsafe_allow_html=True)
@@ -418,7 +423,7 @@ if generate_clicked:
 
             # 6️⃣ Display Results
             if results:
-                st.toast("✅ WER evaluation report generated successfully!", icon="✅")
+                st.toast("WER evaluation report generated successfully!", icon="✅")
                 st.session_state["wer_results"] = results
                 st.session_state["result_language"] = selected_language
                 st.session_state["result_month"] = selected_month
@@ -471,10 +476,13 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     
     # Show success message after download
     if st.session_state.get("download_clicked"):
-        st.success("✅ Download completed successfully!")
-        if st.button("Clear message", key="clear_download_msg"):
-            st.session_state["download_clicked"] = False
-            st.rerun()
+        col1, col2 = st.columns([20, 1])
+        with col1:
+            st.success("✅ Download completed successfully!")
+        with col2:
+            if st.button("✕", key="close_download_msg", help="Close message"):
+                st.session_state["download_clicked"] = False
+                st.rerun()
 
     
     # Calculate tool-wise statistics using native Python
@@ -491,17 +499,17 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     tool_summary = {}
     for tool, scores in tool_stats.items():
         tool_summary[tool] = {
-            "Average WER": round(sum(scores) / len(scores), 2),
-            "Best Score": round(min(scores), 2),
-            "Worst Score": round(max(scores), 2)
+            "Average WER Score": round(sum(scores) / len(scores), 2),
+            "Best WER Score": round(min(scores), 2),
+            "Worst WER Score": round(max(scores), 2)
         }
     
     # Find best and worst performing tools
     if tool_summary:
-        best_tool = min(tool_summary, key=lambda x: tool_summary[x]["Average WER"])
-        best_wer = tool_summary[best_tool]["Average WER"]
-        worst_tool = max(tool_summary, key=lambda x: tool_summary[x]["Average WER"])
-        worst_wer = tool_summary[worst_tool]["Average WER"]
+        best_tool = min(tool_summary, key=lambda x: tool_summary[x]["Average WER Score"])
+        best_wer = tool_summary[best_tool]["Average WER Score"]
+        worst_tool = max(tool_summary, key=lambda x: tool_summary[x]["Average WER Score"])
+        worst_wer = tool_summary[worst_tool]["Average WER Score"]
     else:
         best_tool = "N/A"
         best_wer = 0
@@ -548,16 +556,31 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     st.dataframe(tool_stats_list, use_container_width=True, hide_index=True)
     
     # Download tool-wise metrics - create CSV string
-    csv_lines = ["AI Tool,Average WER,Best Score,Worst Score"]
+    csv_lines = ["AI Tool,Average WER Score,Best WER Score,Worst WER Score"]
     for tool, stats in tool_summary.items():
-        csv_lines.append(f"{tool},{stats['Average WER']},{stats['Best Score']},{stats['Worst Score']}")
+        csv_lines.append(f"{tool},{stats['Average WER Score']},{stats['Best WER Score']},{stats['Worst WER Score']}")
     tool_metrics_csv = "\n".join(csv_lines)
+    
+    # Download tool metrics button with callback
+    def mark_metrics_download_clicked():
+        st.session_state["metrics_download_clicked"] = True
     
     st.download_button(
         label="📥 Download Tool Metrics as CSV",
         data=tool_metrics_csv,
         file_name=f"wer_tool_metrics_{selected_language}_{selected_month}_{selected_year}.csv",
-        mime="text/csv"
+        mime="text/csv",
+        on_click=mark_metrics_download_clicked
     )
+    
+    # Show success message after download
+    if st.session_state.get("metrics_download_clicked"):
+        col1, col2 = st.columns([20, 1])
+        with col1:
+            st.success("✅ Download completed successfully!")
+        with col2:
+            if st.button("✕", key="close_metrics_msg", help="Close message"):
+                st.session_state["metrics_download_clicked"] = False
+                st.rerun()
     
     
