@@ -91,6 +91,21 @@ st.markdown("""
         background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
     }
     
+    /* Disabled button styling */
+    .stButton > button:disabled {
+        background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%) !important;
+        color: white !important;
+        opacity: 0.6 !important;
+        cursor: not-allowed !important;
+        box-shadow: 0 2px 8px rgba(107, 114, 128, 0.2) !important;
+    }
+    
+    .stButton > button:disabled:hover {
+        transform: none !important;
+        box-shadow: 0 2px 8px rgba(107, 114, 128, 0.2) !important;
+        background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%) !important;
+    }
+    
     /* Download button styling */
     .stDownloadButton > button {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
@@ -220,6 +235,9 @@ except Exception as e:
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
+if "generating_report" not in st.session_state:
+    st.session_state["generating_report"] = False
+
 # If not logged in → show login
 if not st.session_state["authenticated"]:
     login_user()
@@ -319,10 +337,25 @@ with col3:
 
 with col4:
     st.markdown("<p style='font-size: 12px; color: #6b7280; font-weight: 600;'>Action</p>", unsafe_allow_html=True)
-    generate_clicked = st.button("🔄 Generate Report", use_container_width=True, key="generate_btn")
+    
+    # Determine button text and disabled state
+    has_results = "wer_results" in st.session_state and st.session_state["wer_results"]
+    button_text = "🔄 Generate Report Again" if has_results else "🔄 Generate Report"
+    button_disabled = st.session_state["generating_report"]
+    
+    generate_clicked = st.button(
+        button_text, 
+        use_container_width=True, 
+        key="generate_btn",
+        disabled=button_disabled
+    )
 
 # Processing and results
 if generate_clicked:
+    st.session_state["generating_report"] = True
+    st.rerun()
+
+if st.session_state["generating_report"]:
     service = get_drive_service()
 
     progress_placeholder = st.empty()
@@ -455,10 +488,13 @@ if generate_clicked:
                 st.session_state["result_language"] = selected_language
                 st.session_state["result_month"] = selected_month
                 st.session_state["result_year"] = selected_year
+                st.session_state["generating_report"] = False
+                st.rerun()
                 
     except Exception as e:
         progress_placeholder.empty()
         status_placeholder.empty()
+        st.session_state["generating_report"] = False
         st.error(f"❌ An error occurred during processing: {str(e)}")
 
 # Display persisted results
