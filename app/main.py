@@ -8,6 +8,12 @@ from drive.drive_utils import find_folder, list_srt_files, traverse_structure
 from drive.drive_service import get_drive_service
 from drive.drive_utils import download_file_content
 import os
+import requests
+import csv
+import io
+
+
+BACKEND_URL = "http://127.0.0.1:8000/api/wer"
 
 
 # Configure page
@@ -321,21 +327,332 @@ with col4:
     st.markdown("<p style='font-size: 12px; color: #6b7280; font-weight: 600;'>Action</p>", unsafe_allow_html=True)
     generate_clicked = st.button("🔄 Generate Report", use_container_width=True, key="generate_btn")
 
-# Processing and results
-if generate_clicked:
-    service = get_drive_service()
+# # Processing and results
+# if generate_clicked:
+#     service = get_drive_service()
 
-    progress_placeholder = st.empty()
-    status_placeholder = st.empty()
+#     progress_placeholder = st.empty()
+#     status_placeholder = st.empty()
     
-    with progress_placeholder.container():
-        progress_bar = st.progress(0)
+#     with progress_placeholder.container():
+#         progress_bar = st.progress(0)
     
-    try:
-        # 1️⃣ Navigate folder structure
-        with status_placeholder.container():
-            st.info("🔍 Navigating folder structure...")
+#     try:
+#         # 1️⃣ Navigate folder structure
+#         with status_placeholder.container():
+#             st.info("🔍 Navigating folder structure...")
         
+#         language_id = traverse_structure(
+#             service,
+#             Config.GOOGLE_DRIVE_ROOT_ID,
+#             selected_year,
+#             selected_month,
+#             selected_language
+#         )
+#         progress_bar.progress(20)
+
+#         # 2️⃣ Locate subfolders
+#         with status_placeholder.container():
+#             st.info("📁 Locating Original and AI folders...")
+        
+#         original_folder = find_folder(service, language_id, "Original_Files")
+#         ai_folder = find_folder(service, language_id, "AI_Generated_Files")
+
+#         if not original_folder or not ai_folder:
+#             status_placeholder.empty()
+#             progress_placeholder.empty()
+#             st.error("❌ Original or AI folder missing. Please check your drive structure.")
+#             st.stop()
+
+#         progress_bar.progress(40)
+
+#         # Only proceed with processing if folders exist
+#         with st.spinner("⏳ Processing WER report... This may take a moment"):
+            
+#             original_id = original_folder[0]["id"]
+#             ai_id = ai_folder[0]["id"]
+
+#             # 3️⃣ Fetch all SRT files
+#             with status_placeholder.container():
+#                 st.info("📄 Fetching SRT files...")
+            
+#             original_files = list_srt_files(service, original_id)
+#             ai_files = list_srt_files(service, ai_id)
+
+#             if not original_files:
+#                 st.warning("⚠️ No Original files found.")
+#                 st.stop()
+
+#             if not ai_files:
+#                 st.warning("⚠️ No AI files found.")
+#                 st.stop()
+
+#             progress_bar.progress(60)
+
+#             # 4️⃣ Build AI Mapping
+#             ai_mapping = {}
+
+#             for file in ai_files:
+#                 filename = file["name"]
+#                 file_id = file["id"]
+
+#                 name_without_ext = os.path.splitext(filename)[0]
+
+#                 if "_" not in name_without_ext:
+#                     continue
+
+#                 parts = name_without_ext.split("_")
+
+#                 base_name, ai_tool = name_without_ext.rsplit("_", 1)
+
+#                 if base_name not in ai_mapping:
+#                     ai_mapping[base_name] = []
+
+#                 ai_mapping[base_name].append({
+#                     "ai_tool": ai_tool,
+#                     "file_id": file_id
+#                 })
+
+#             progress_bar.progress(70)
+
+#             # 5️⃣ Process Batch
+#             with status_placeholder.container():
+#                 st.info("⚡ Calculating WER scores... Processing files...")
+            
+#             results = []
+
+#             for original in original_files:
+
+#                 original_filename = original["name"]
+#                 base_name = os.path.splitext(original_filename)[0]
+
+#                 if base_name not in ai_mapping:
+#                     continue
+
+#                 # Download original once
+#                 original_content = download_file_content(service, original["id"])
+#                 original_text = parse_srt(original_content)
+
+#                 for ai in ai_mapping[base_name]:
+
+#                     ai_content = download_file_content(service, ai["file_id"])
+#                     ai_text = parse_srt(ai_content)
+
+#                     wer_result = calculate_wer(original_text, ai_text)
+
+#                     wer_score = wer_result["wer"]
+
+#                     results.append({
+#                         "File Name": base_name,
+#                         "AI Tool": ai["ai_tool"],
+#                         "WER Score (%)": round(wer_score, 2)
+#                     })
+
+#             progress_bar.progress(100)
+
+#             # Clear progress indicators
+#             progress_placeholder.empty()
+#             status_placeholder.empty()
+
+#             if results:
+#     st.toast("WER evaluation report generated successfully!", icon="✅")
+
+#     st.session_state["wer_results"] = results
+#     st.session_state["result_language"] = selected_language
+#     st.session_state["result_month"] = selected_month
+#     st.session_state["result_year"] = selected_year
+
+#     # -----------------------------
+#     # 🔥 SAVE TO BACKEND (MongoDB)
+#     # -----------------------------
+
+#     try:
+#         report_payload = {
+#             "language": selected_language,
+#             "year": selected_year,
+#             "month": selected_month,
+#             "detailed_results": results,
+#             "performance_summary": {
+#                 "best_tool": best_tool,
+#                 "best_avg_wer": best_wer,
+#                 "worst_tool": worst_tool,
+#                 "worst_avg_wer": worst_wer,
+#                 "total_tools": len(tool_stats)
+#             },
+#             "tool_wise_metrics": tool_stats_list
+#         }
+
+#         response = requests.post(
+#             f"{BACKEND_URL}/save-report",
+#             json=report_payload
+#         )
+
+#         if response.status_code == 200:
+#             st.success("✅ Report stored successfully in MongoDB")
+#         else:
+#             st.error(f"Backend Error: {response.text}")
+
+#     except Exception as e:
+#         st.error(f"Failed to store report: {str(e)}")
+
+# # Display persisted results
+# if "wer_results" in st.session_state and st.session_state["wer_results"]:
+#     # Initialize download state
+#     if "download_clicked" not in st.session_state:
+#         st.session_state["download_clicked"] = False
+    
+#     results = st.session_state["wer_results"]
+#     selected_language = st.session_state.get("result_language", "")
+#     selected_month = st.session_state.get("result_month", "")
+#     selected_year = st.session_state.get("result_year", "")
+    
+#     # Display results table using Streamlit's native support
+#     st.markdown("<h3 style='margin-top: 30px;'>Detailed Results</h3>", unsafe_allow_html=True)
+#     st.dataframe(results, use_container_width=True, hide_index=True)
+
+#     # Export option - create CSV from results list
+#     import csv
+#     import io
+    
+#     csv_buffer = io.StringIO()
+#     if results:
+#         writer = csv.DictWriter(csv_buffer, fieldnames=results[0].keys())
+#         writer.writeheader()
+#         writer.writerows(results)
+#         csv_content = csv_buffer.getvalue()
+#     else:
+#         csv_content = ""
+    
+#     # Download button with callback
+#     def mark_download_clicked():
+#         st.session_state["download_clicked"] = True
+    
+#     st.download_button(
+#         label="📥 Download Results as CSV",
+#         data=csv_content,
+#         file_name=f"wer_report_{selected_language}_{selected_month}_{selected_year}.csv",
+#         mime="text/csv",
+#         on_click=mark_download_clicked
+#     )
+    
+#     # Show success message after download
+#     if st.session_state.get("download_clicked"):
+#         col1, col2 = st.columns([20, 1])
+#         with col1:
+#             st.success("✅ Download completed successfully!")
+#         with col2:
+#             if st.button("✕", key="close_download_msg", help="Close message"):
+#                 st.session_state["download_clicked"] = False
+#                 st.rerun()
+
+    
+#     # Calculate tool-wise statistics using native Python
+#     tool_stats = {}
+#     for result in results:
+#         tool = result.get("AI Tool", "Unknown")
+#         wer_score = result.get("WER Score (%)", 0)
+        
+#         if tool not in tool_stats:
+#             tool_stats[tool] = []
+#         tool_stats[tool].append(wer_score)
+    
+#     # Calculate averages, min, max for each tool
+#     tool_summary = {}
+#     for tool, scores in tool_stats.items():
+#         tool_summary[tool] = {
+#             "Average WER Score": round(sum(scores) / len(scores), 2),
+#             "Best WER Score": round(min(scores), 2),
+#             "Worst WER Score": round(max(scores), 2)
+#         }
+    
+#     # Find best and worst performing tools
+#     if tool_summary:
+#         best_tool = min(tool_summary, key=lambda x: tool_summary[x]["Average WER Score"])
+#         best_wer = tool_summary[best_tool]["Average WER Score"]
+#         worst_tool = max(tool_summary, key=lambda x: tool_summary[x]["Average WER Score"])
+#         worst_wer = tool_summary[worst_tool]["Average WER Score"]
+#     else:
+#         best_tool = "N/A"
+#         best_wer = 0
+#         worst_tool = "N/A"
+#         worst_wer = 0
+    
+#     # Display summary metrics
+#     st.markdown("<h3 style='margin-top: 30px;'>📊 Performance Summary</h3>", unsafe_allow_html=True)
+    
+#     col1, col2, col3 = st.columns(3)
+    
+#     with col1:
+#         st.markdown(f"""
+#         <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 12px; padding: 20px; text-align: center;">
+#             <p style="color: #065f46; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">🏆 Best Performing Tool</p>
+#             <p style="color: #047857; font-size: 24px; font-weight: 700; margin: 0;">{best_tool}</p>
+#             <p style="color: #059669; font-size: 13px; margin: 8px 0 0 0;">Avg WER: {best_wer}%</p>
+#         </div>
+#         """, unsafe_allow_html=True)
+    
+#     with col2:
+#         st.markdown(f"""
+#         <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 12px; padding: 20px; text-align: center;">
+#             <p style="color: #991b1b; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">⚠️ Low Performing Tool</p>
+#             <p style="color: #dc2626; font-size: 24px; font-weight: 700; margin: 0;">{worst_tool}</p>
+#             <p style="color: #b91c1c; font-size: 13px; margin: 8px 0 0 0;">Avg WER: {worst_wer}%</p>
+#         </div>
+#         """, unsafe_allow_html=True)
+    
+#     with col3:
+#         st.markdown(f"""
+#         <div style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); border-radius: 12px; padding: 20px; text-align: center;">
+#             <p style="color: #1e40af; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">📈 Total Tools</p>
+#             <p style="color: #1e3a8a; font-size: 24px; font-weight: 700; margin: 0;">{len(tool_stats)}</p>
+#             <p style="color: #1e40af; font-size: 13px; margin: 8px 0 0 0;">Analyzed</p>
+#         </div>
+#         """, unsafe_allow_html=True)
+    
+#     # Display tool-wise average WER table
+#     st.markdown("<h3 style='margin-top: 30px;'>Tool-wise WER Metrics</h3>", unsafe_allow_html=True)
+    
+#     # Convert tool_summary dict to list of dicts for proper dataframe display
+#     tool_stats_list = [{"AI Tool": tool, **stats} for tool, stats in tool_summary.items()]
+#     st.dataframe(tool_stats_list, use_container_width=True, hide_index=True)
+    
+#     # Download tool-wise metrics - create CSV string
+#     csv_lines = ["AI Tool,Average WER Score,Best WER Score,Worst WER Score"]
+#     for tool, stats in tool_summary.items():
+#         csv_lines.append(f"{tool},{stats['Average WER Score']},{stats['Best WER Score']},{stats['Worst WER Score']}")
+#     tool_metrics_csv = "\n".join(csv_lines)
+    
+#     # Download tool metrics button with callback
+#     def mark_metrics_download_clicked():
+#         st.session_state["metrics_download_clicked"] = True
+    
+#     st.download_button(
+#         label="📥 Download Tool Metrics as CSV",
+#         data=tool_metrics_csv,
+#         file_name=f"wer_tool_metrics_{selected_language}_{selected_month}_{selected_year}.csv",
+#         mime="text/csv",
+#         on_click=mark_metrics_download_clicked
+#     )
+    
+#     # Show success message after download
+#     if st.session_state.get("metrics_download_clicked"):
+#         col1, col2 = st.columns([20, 1])
+#         with col1:
+#             st.success("✅ Download completed successfully!")
+#         with col2:
+#             if st.button("✕", key="close_metrics_msg", help="Close message"):
+#                 st.session_state["metrics_download_clicked"] = False
+#                 st.rerun()
+    
+    # ============================================================
+# REPORT GENERATION
+# ============================================================
+if generate_clicked:
+
+    service = get_drive_service()
+    results = []
+
+    try:
         language_id = traverse_structure(
             service,
             Config.GOOGLE_DRIVE_ROOT_ID,
@@ -343,271 +660,158 @@ if generate_clicked:
             selected_month,
             selected_language
         )
-        progress_bar.progress(20)
 
-        # 2️⃣ Locate subfolders
-        with status_placeholder.container():
-            st.info("📁 Locating Original and AI folders...")
-        
         original_folder = find_folder(service, language_id, "Original_Files")
         ai_folder = find_folder(service, language_id, "AI_Generated_Files")
 
         if not original_folder or not ai_folder:
-            status_placeholder.empty()
-            progress_placeholder.empty()
-            st.error("❌ Original or AI folder missing. Please check your drive structure.")
+            st.error("Original or AI folder missing.")
             st.stop()
 
-        progress_bar.progress(40)
+        original_id = original_folder[0]["id"]
+        ai_id = ai_folder[0]["id"]
 
-        # Only proceed with processing if folders exist
-        with st.spinner("⏳ Processing WER report... This may take a moment"):
-            
-            original_id = original_folder[0]["id"]
-            ai_id = ai_folder[0]["id"]
+        original_files = list_srt_files(service, original_id)
+        ai_files = list_srt_files(service, ai_id)
 
-            # 3️⃣ Fetch all SRT files
-            with status_placeholder.container():
-                st.info("📄 Fetching SRT files...")
-            
-            original_files = list_srt_files(service, original_id)
-            ai_files = list_srt_files(service, ai_id)
+        # Build AI Mapping
+        ai_mapping = {}
+        for file in ai_files:
+            name = os.path.splitext(file["name"])[0]
+            if "_" not in name:
+                continue
+            base_name, ai_tool = name.rsplit("_", 1)
+            ai_mapping.setdefault(base_name, []).append({
+                "ai_tool": ai_tool,
+                "file_id": file["id"]
+            })
 
-            if not original_files:
-                st.warning("⚠️ No Original files found.")
-                st.stop()
+        # Process Files
+        for original in original_files:
+            base_name = os.path.splitext(original["name"])[0]
 
-            if not ai_files:
-                st.warning("⚠️ No AI files found.")
-                st.stop()
+            if base_name not in ai_mapping:
+                continue
 
-            progress_bar.progress(60)
+            original_text = parse_srt(
+                download_file_content(service, original["id"])
+            )
 
-            # 4️⃣ Build AI Mapping
-            ai_mapping = {}
+            for ai in ai_mapping[base_name]:
+                ai_text = parse_srt(
+                    download_file_content(service, ai["file_id"])
+                )
 
-            for file in ai_files:
-                filename = file["name"]
-                file_id = file["id"]
+                wer_score = calculate_wer(original_text, ai_text)["wer"]
 
-                name_without_ext = os.path.splitext(filename)[0]
-
-                if "_" not in name_without_ext:
-                    continue
-
-                parts = name_without_ext.split("_")
-
-                base_name, ai_tool = name_without_ext.rsplit("_", 1)
-
-                if base_name not in ai_mapping:
-                    ai_mapping[base_name] = []
-
-                ai_mapping[base_name].append({
-                    "ai_tool": ai_tool,
-                    "file_id": file_id
+                results.append({
+                    "File Name": base_name,
+                    "AI Tool": ai["ai_tool"],
+                    "WER Score (%)": round(wer_score, 2)
                 })
 
-            progress_bar.progress(70)
+        # Save to session
+        st.session_state["wer_results"] = results
+        st.session_state["result_language"] = selected_language
+        st.session_state["result_year"] = selected_year
+        st.session_state["result_month"] = selected_month
 
-            # 5️⃣ Process Batch
-            with status_placeholder.container():
-                st.info("⚡ Calculating WER scores... Processing files...")
-            
-            results = []
+        st.success("Report Generated Successfully!")
 
-            for original in original_files:
-
-                original_filename = original["name"]
-                base_name = os.path.splitext(original_filename)[0]
-
-                if base_name not in ai_mapping:
-                    continue
-
-                # Download original once
-                original_content = download_file_content(service, original["id"])
-                original_text = parse_srt(original_content)
-
-                for ai in ai_mapping[base_name]:
-
-                    ai_content = download_file_content(service, ai["file_id"])
-                    ai_text = parse_srt(ai_content)
-
-                    wer_result = calculate_wer(original_text, ai_text)
-
-                    wer_score = wer_result["wer"]
-
-                    results.append({
-                        "File Name": base_name,
-                        "AI Tool": ai["ai_tool"],
-                        "WER Score (%)": round(wer_score, 2)
-                    })
-
-            progress_bar.progress(100)
-
-            # Clear progress indicators
-            progress_placeholder.empty()
-            status_placeholder.empty()
-
-            # 6️⃣ Display Results
-            if results:
-                st.toast("WER evaluation report generated successfully!", icon="✅")
-                st.session_state["wer_results"] = results
-                st.session_state["result_language"] = selected_language
-                st.session_state["result_month"] = selected_month
-                st.session_state["result_year"] = selected_year
-                
     except Exception as e:
-        progress_placeholder.empty()
-        status_placeholder.empty()
-        st.error(f"❌ An error occurred during processing: {str(e)}")
+        st.error(f"Error generating report: {e}")
 
-# Display persisted results
-if "wer_results" in st.session_state and st.session_state["wer_results"]:
-    # Initialize download state
-    if "download_clicked" not in st.session_state:
-        st.session_state["download_clicked"] = False
-    
+# ============================================================
+# DISPLAY RESULTS
+# ============================================================
+if "wer_results" in st.session_state:
+
     results = st.session_state["wer_results"]
-    selected_language = st.session_state.get("result_language", "")
-    selected_month = st.session_state.get("result_month", "")
-    selected_year = st.session_state.get("result_year", "")
-    
-    # Display results table using Streamlit's native support
-    st.markdown("<h3 style='margin-top: 30px;'>Detailed Results</h3>", unsafe_allow_html=True)
-    st.dataframe(results, use_container_width=True, hide_index=True)
 
-    # Export option - create CSV from results list
-    import csv
-    import io
-    
-    csv_buffer = io.StringIO()
     if results:
+        st.subheader("Detailed Results")
+        st.dataframe(results, use_container_width=True)
+
+        # -------------------------
+        # TOOL STATS CALCULATION
+        # -------------------------
+        tool_stats = {}
+        for r in results:
+            tool_stats.setdefault(r["AI Tool"], []).append(r["WER Score (%)"])
+
+        tool_summary = {}
+        for tool, scores in tool_stats.items():
+            tool_summary[tool] = {
+                "Average WER Score": round(sum(scores)/len(scores), 2),
+                "Best WER Score": round(min(scores), 2),
+                "Worst WER Score": round(max(scores), 2)
+            }
+
+        best_tool = min(tool_summary, key=lambda x: tool_summary[x]["Average WER Score"])
+        worst_tool = max(tool_summary, key=lambda x: tool_summary[x]["Average WER Score"])
+
+        best_wer = tool_summary[best_tool]["Average WER Score"]
+        worst_wer = tool_summary[worst_tool]["Average WER Score"]
+
+        # -------------------------
+        # SUMMARY DISPLAY
+        # -------------------------
+        st.subheader("Performance Summary")
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Best Tool", best_tool, f"{best_wer}%")
+        col2.metric("Worst Tool", worst_tool, f"{worst_wer}%")
+        col3.metric("Total Tools", len(tool_summary))
+
+        tool_stats_list = [{"AI Tool": tool, **stats}
+                           for tool, stats in tool_summary.items()]
+
+        st.subheader("Tool-wise Metrics")
+        st.dataframe(tool_stats_list)
+
+        # -------------------------
+        # SAVE TO BACKEND (AFTER CALCULATION)
+        # -------------------------
+        try:
+            payload = {
+                "language": st.session_state["result_language"],
+                "year": st.session_state["result_year"],
+                "month": st.session_state["result_month"],
+                "detailed_results": results,
+                "performance_summary": {
+                    "best_tool": best_tool,
+                    "best_avg_wer": best_wer,
+                    "worst_tool": worst_tool,
+                    "worst_avg_wer": worst_wer,
+                    "total_tools": len(tool_summary)
+                },
+                "tool_wise_metrics": tool_stats_list
+            }
+
+            response = requests.post(
+                f"{BACKEND_URL}/save-report",
+                json=payload
+            )
+
+            if response.status_code == 200:
+                st.success("Report Stored in MongoDB Successfully")
+            else:
+                st.error(f"Backend Error: {response.text}")
+
+        except Exception as e:
+            st.error(f"Backend Save Failed: {e}")
+
+        # -------------------------
+        # CSV DOWNLOAD
+        # -------------------------
+        csv_buffer = io.StringIO()
         writer = csv.DictWriter(csv_buffer, fieldnames=results[0].keys())
         writer.writeheader()
         writer.writerows(results)
-        csv_content = csv_buffer.getvalue()
-    else:
-        csv_content = ""
-    
-    # Download button with callback
-    def mark_download_clicked():
-        st.session_state["download_clicked"] = True
-    
-    st.download_button(
-        label="📥 Download Results as CSV",
-        data=csv_content,
-        file_name=f"wer_report_{selected_language}_{selected_month}_{selected_year}.csv",
-        mime="text/csv",
-        on_click=mark_download_clicked
-    )
-    
-    # Show success message after download
-    if st.session_state.get("download_clicked"):
-        col1, col2 = st.columns([20, 1])
-        with col1:
-            st.success("✅ Download completed successfully!")
-        with col2:
-            if st.button("✕", key="close_download_msg", help="Close message"):
-                st.session_state["download_clicked"] = False
-                st.rerun()
 
-    
-    # Calculate tool-wise statistics using native Python
-    tool_stats = {}
-    for result in results:
-        tool = result.get("AI Tool", "Unknown")
-        wer_score = result.get("WER Score (%)", 0)
-        
-        if tool not in tool_stats:
-            tool_stats[tool] = []
-        tool_stats[tool].append(wer_score)
-    
-    # Calculate averages, min, max for each tool
-    tool_summary = {}
-    for tool, scores in tool_stats.items():
-        tool_summary[tool] = {
-            "Average WER Score": round(sum(scores) / len(scores), 2),
-            "Best WER Score": round(min(scores), 2),
-            "Worst WER Score": round(max(scores), 2)
-        }
-    
-    # Find best and worst performing tools
-    if tool_summary:
-        best_tool = min(tool_summary, key=lambda x: tool_summary[x]["Average WER Score"])
-        best_wer = tool_summary[best_tool]["Average WER Score"]
-        worst_tool = max(tool_summary, key=lambda x: tool_summary[x]["Average WER Score"])
-        worst_wer = tool_summary[worst_tool]["Average WER Score"]
-    else:
-        best_tool = "N/A"
-        best_wer = 0
-        worst_tool = "N/A"
-        worst_wer = 0
-    
-    # Display summary metrics
-    st.markdown("<h3 style='margin-top: 30px;'>📊 Performance Summary</h3>", unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 12px; padding: 20px; text-align: center;">
-            <p style="color: #065f46; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">🏆 Best Performing Tool</p>
-            <p style="color: #047857; font-size: 24px; font-weight: 700; margin: 0;">{best_tool}</p>
-            <p style="color: #059669; font-size: 13px; margin: 8px 0 0 0;">Avg WER: {best_wer}%</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 12px; padding: 20px; text-align: center;">
-            <p style="color: #991b1b; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">⚠️ Low Performing Tool</p>
-            <p style="color: #dc2626; font-size: 24px; font-weight: 700; margin: 0;">{worst_tool}</p>
-            <p style="color: #b91c1c; font-size: 13px; margin: 8px 0 0 0;">Avg WER: {worst_wer}%</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); border-radius: 12px; padding: 20px; text-align: center;">
-            <p style="color: #1e40af; font-size: 14px; font-weight: 600; margin: 0 0 10px 0;">📈 Total Tools</p>
-            <p style="color: #1e3a8a; font-size: 24px; font-weight: 700; margin: 0;">{len(tool_stats)}</p>
-            <p style="color: #1e40af; font-size: 13px; margin: 8px 0 0 0;">Analyzed</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Display tool-wise average WER table
-    st.markdown("<h3 style='margin-top: 30px;'>Tool-wise WER Metrics</h3>", unsafe_allow_html=True)
-    
-    # Convert tool_summary dict to list of dicts for proper dataframe display
-    tool_stats_list = [{"AI Tool": tool, **stats} for tool, stats in tool_summary.items()]
-    st.dataframe(tool_stats_list, use_container_width=True, hide_index=True)
-    
-    # Download tool-wise metrics - create CSV string
-    csv_lines = ["AI Tool,Average WER Score,Best WER Score,Worst WER Score"]
-    for tool, stats in tool_summary.items():
-        csv_lines.append(f"{tool},{stats['Average WER Score']},{stats['Best WER Score']},{stats['Worst WER Score']}")
-    tool_metrics_csv = "\n".join(csv_lines)
-    
-    # Download tool metrics button with callback
-    def mark_metrics_download_clicked():
-        st.session_state["metrics_download_clicked"] = True
-    
-    st.download_button(
-        label="📥 Download Tool Metrics as CSV",
-        data=tool_metrics_csv,
-        file_name=f"wer_tool_metrics_{selected_language}_{selected_month}_{selected_year}.csv",
-        mime="text/csv",
-        on_click=mark_metrics_download_clicked
-    )
-    
-    # Show success message after download
-    if st.session_state.get("metrics_download_clicked"):
-        col1, col2 = st.columns([20, 1])
-        with col1:
-            st.success("✅ Download completed successfully!")
-        with col2:
-            if st.button("✕", key="close_metrics_msg", help="Close message"):
-                st.session_state["metrics_download_clicked"] = False
-                st.rerun()
-    
-    
+        st.download_button(
+            "Download Detailed CSV",
+            csv_buffer.getvalue(),
+            file_name="wer_report.csv",
+            mime="text/csv"
+        )
