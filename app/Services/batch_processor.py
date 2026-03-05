@@ -55,3 +55,4 @@ def process_batch(original_files, ai_files, drive_service):
                 logging.error(f"Error processing {base_name} - {ai_tool}: {str(e)}")
 
     return results
+
