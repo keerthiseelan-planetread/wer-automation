@@ -27,191 +27,190 @@ st.set_page_config(
 # Apply custom CSS styling
 st.markdown("""
 <style>
-    /* Hide entire Streamlit header */
-    [data-testid="stHeader"] {
-        display: none !important;
-    }
-    
-    /* Hide Streamlit toolbar and header elements */
-    [data-testid="stToolbar"] {
-        display: none !important;
-    }
-    
-    .stToolbarActions {
-        display: none !important;
-    }
-    
-    [data-testid="stViewerBadge"] {
-        display: none !important;
-    }
-    
-    [data-testid="stDecoration"] {
-        display: none !important;
-    }
-    
-    /* Hide header element */
-    header {
-        display: none !important;
-    }
-    
-    /* Global styles */
-    .stApp {
-        background: linear-gradient(to bottom, #f8fafc 0%, #ffffff 100%);
-    }
-    
-    /* Sidebar styling */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e40af 0%, #003da5 100%);
-    }
-    
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: white;
-    }
-    
-    /* Header styling */
-    h1 {
-        color: #1e40af !important;
-        border-bottom: 3px solid #3b82f6 !important;
-        padding-bottom: 20px !important;
-    }
-    
-    h2, h3 {
-        color: #1e40af !important;
-    }
-    
-    /* Button styling */
-    .stButton > button {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 10px 24px !important;
-        font-weight: 600 !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2) !important;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3) !important;
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-    }
-    
-    /* Download button styling */
-    .stDownloadButton > button {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 10px 24px !important;
-        font-weight: 600 !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2) !important;
-    }
-    
-    .stDownloadButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3) !important;
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-    }
-    
-    /* Selectbox styling */
-    .stSelectbox > div > div {
-        border: 2px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        background-color: white !important;
-        color: #1f2937 !important;
-    }
-    
-    .stSelectbox [data-baseweb="select"] {
-        color: #1f2937 !important;
-    }
-    
-    .stSelectbox > div > div > div {
-        color: #1f2937 !important;
-    }
-    
-    .stSelectbox > div > div:focus-within {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
-    }
-    
-    /* Dataframe styling */
-    .dataframe {
-        border-radius: 8px !important;
-        border: 2px solid #e5e7eb !important;
-    }
-    
-    /* Alert styling */
-    .stAlert {
-        border-radius: 8px !important;
-        border: none !important;
-    }
-    
-    .stSuccess {
-        background-color: #d1fae5 !important;
-        color: #065f46 !important;
-    }
-    
-    .stError {
-        background-color: #fee2e2 !important;
-        color: #991b1b !important;
-    }
-    
-    .stWarning {
-        background-color: #fef3c7 !important;
-        color: #92400e !important;
-    }
-    
-    /* Spinner styling */
-    .stSpinner {
-        color: #3b82f6 !important;
-    }
-    
-    /* Metric styling */
-    .metric-card {
-        background: white;
-        border-left: 4px solid #3b82f6;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        margin-bottom: 10px;
-    }
-    
-    .metric-label {
-        color: #6b7280;
-        font-size: 14px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .metric-value {
-        color: #1e40af;
-        font-size: 28px;
-        font-weight: 700;
-        margin-top: 5px;
-    }
-    
-    /* Card styling */
-    .param-card {
-        background: white;
-        border-radius: 12px;
-        padding: 25px;
-        border: 2px solid #e5e7eb;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-    
-    /* Sidebar logout button appearance */
-    [data-testid="stSidebar"] .stButton > button {
-        width: 100%;
-        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
-        border-radius: 6px !important;
-    }
-    
-    [data-testid="stSidebar"] .stButton > button:hover {
-        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
-    }
+
+/* Hide entire Streamlit header */
+[data-testid="stHeader"] {
+    display: none !important;
+}
+
+/* Hide Streamlit toolbar */
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+
+.stToolbarActions {
+    display: none !important;
+}
+
+[data-testid="stViewerBadge"] {
+    display: none !important;
+}
+
+[data-testid="stDecoration"] {
+    display: none !important;
+}
+
+header {
+    display: none !important;
+}
+
+/* Global background */
+.stApp {
+    background: linear-gradient(to bottom, #f8fafc 0%, #ffffff 100%);
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #1e40af 0%, #003da5 100%);
+}
+
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+    color: white;
+}
+
+/* Headings */
+h1 {
+    color: #1e40af !important;
+    border-bottom: 3px solid #3b82f6 !important;
+    padding-bottom: 20px !important;
+}
+
+h2, h3 {
+    color: #1e40af !important;
+}
+
+/* Buttons */
+.stButton > button {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 10px 24px !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(59,130,246,0.2) !important;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(59,130,246,0.3) !important;
+}
+
+/* Download button */
+.stDownloadButton > button {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    color: white !important;
+    border-radius: 8px !important;
+}
+
+/* Selectbox */
+.stSelectbox > div > div {
+    border: 2px solid #e5e7eb !important;
+    border-radius: 8px !important;
+}
+
+/* Dataframe */
+.dataframe {
+    border-radius: 8px !important;
+    border: 2px solid #e5e7eb !important;
+}
+
+/* Alerts base style */
+.stAlert {
+    border-radius: 8px !important;
+    border: none !important;
+}
+
+/* SUCCESS MESSAGE DARK GREEN */
+
+div[data-testid="stAlert"] {
+    background-color: #16a34a !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+/* Success text */
+div[data-testid="stAlert"] p {
+    color: white !important;
+}
+
+/* Success icon */
+div[data-testid="stAlert"] svg {
+    fill: white !important;
+}
+
+/* Error */
+.stError {
+    background-color: #fee2e2 !important;
+    color: #991b1b !important;
+}
+
+/* Warning */
+.stWarning {
+    background-color: #fef3c7 !important;
+    color: #92400e !important;
+}
+
+/* Spinner */
+.stSpinner {
+    color: #3b82f6 !important;
+}
+
+/* ============================= */
+/* RESULTS SECTION */
+/* ============================= */
+
+.results-card {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    border: 2px solid #e5e7eb;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    margin-top: 25px;
+}
+
+.results-title {
+    color: #1e40af;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 15px;
+}
+
+/* Summary cards */
+
+.summary-card{
+    border-radius:12px;
+    padding:20px;
+    text-align:center;
+    box-shadow:0 3px 12px rgba(0,0,0,0.08);
+}
+
+.best-card{
+    background:#16a34a;
+    color:white;
+}
+
+.worst-card{
+    background:#dc2626;
+    color:white;
+}
+
+.total-card{
+    background:#2563eb;
+    color:white;
+}
+
+/* Tool metrics card */
+
+.tool-metrics-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    border: 2px solid #e5e7eb;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    margin-top: 20px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -301,6 +300,8 @@ st.markdown("""
         <p style="color: #6b7280; margin-bottom: 20px;">Select language, year, and month to view WER scores for all AI tools and compare their transcription accuracy</p>
 </div>
 """, unsafe_allow_html=True)
+def clear_results():
+    st.session_state.pop("wer_results", None)
 
 # --- Dropdown Options ---
 languages = ["English", "Hindi", "Punjabi", "Tamil"]
@@ -315,18 +316,39 @@ months = [
 col1, col2, col3, col4 = st.columns([1, 1, 1, 1.2])
 
 with col1:
-    selected_language = st.selectbox("🌐 Language", languages, key="language_select")
+    selected_language = st.selectbox(
+        "🌐 Language",
+        languages,
+        key="language_select",
+        on_change=clear_results
+    )
 
 with col2:
-    selected_year = st.selectbox("📅 Year", years, key="year_select")
+    selected_year = st.selectbox(
+        "📅 Year",
+        years,
+        key="year_select",
+        on_change=clear_results
+    )
 
 with col3:
-    selected_month = st.selectbox("📆 Month", months, key="month_select")
+    selected_month = st.selectbox(
+        "📆 Month",
+        months,
+        key="month_select",
+        on_change=clear_results
+    )
 
 with col4:
-    st.markdown("<p style='font-size: 12px; color: #6b7280; font-weight: 600;'>Action</p>", unsafe_allow_html=True)
-    generate_clicked = st.button("🔄 Generate Report", use_container_width=True, key="generate_btn")
-
+    st.markdown(
+        "<p style='font-size: 12px; color: #6b7280; font-weight: 600;'>Action</p>",
+        unsafe_allow_html=True
+    )
+    generate_clicked = st.button(
+        "🔄 Generate Report",
+        use_container_width=True,
+        key="generate_btn"
+    )
 # # Processing and results
 # if generate_clicked:
 #     service = get_drive_service()
@@ -647,99 +669,121 @@ with col4:
     # ============================================================
 # REPORT GENERATION
 # ============================================================
+# ============================================================
+# GENERATE REPORT
+# ============================================================
+results_placeholder = st.empty()
+
 if generate_clicked:
 
-    service = get_drive_service()
-    results = []
+    st.session_state.pop("wer_results", None)
 
-    try:
-        language_id = traverse_structure(
-            service,
-            Config.GOOGLE_DRIVE_ROOT_ID,
-            selected_year,
-            selected_month,
-            selected_language
-        )
+    with st.spinner("🔄 Loading files and generating WER report... Please wait"):
 
-        original_folder = find_folder(service, language_id, "Original_Files")
-        ai_folder = find_folder(service, language_id, "AI_Generated_Files")
+        service = get_drive_service()
+        results = []
 
-        if not original_folder or not ai_folder:
-            st.error("Original or AI folder missing.")
-            st.stop()
+        try:
 
-        original_id = original_folder[0]["id"]
-        ai_id = ai_folder[0]["id"]
-
-        original_files = list_srt_files(service, original_id)
-        ai_files = list_srt_files(service, ai_id)
-
-        # Build AI Mapping
-        ai_mapping = {}
-        for file in ai_files:
-            name = os.path.splitext(file["name"])[0]
-            if "_" not in name:
-                continue
-            base_name, ai_tool = name.rsplit("_", 1)
-            ai_mapping.setdefault(base_name, []).append({
-                "ai_tool": ai_tool,
-                "file_id": file["id"]
-            })
-
-        # Process Files
-        for original in original_files:
-            base_name = os.path.splitext(original["name"])[0]
-
-            if base_name not in ai_mapping:
-                continue
-
-            original_text = parse_srt(
-                download_file_content(service, original["id"])
+            language_id = traverse_structure(
+                service,
+                Config.GOOGLE_DRIVE_ROOT_ID,
+                selected_year,
+                selected_month,
+                selected_language
             )
 
-            for ai in ai_mapping[base_name]:
-                ai_text = parse_srt(
-                    download_file_content(service, ai["file_id"])
-                )
+            original_folder = find_folder(service, language_id, "Original_Files")
+            ai_folder = find_folder(service, language_id, "AI_Generated_Files")
 
-                wer_score = calculate_wer(original_text, ai_text)["wer"]
+            if not original_folder or not ai_folder:
+                st.error("Original or AI folder missing.")
+                st.stop()
 
-                results.append({
-                    "File Name": base_name,
-                    "AI Tool": ai["ai_tool"],
-                    "WER Score (%)": round(wer_score, 2)
+            original_id = original_folder[0]["id"]
+            ai_id = ai_folder[0]["id"]
+
+            original_files = list_srt_files(service, original_id)
+            ai_files = list_srt_files(service, ai_id)
+
+            ai_mapping = {}
+
+            for file in ai_files:
+
+                name = os.path.splitext(file["name"])[0]
+
+                if "_" not in name:
+                    continue
+
+                base_name, ai_tool = name.rsplit("_", 1)
+
+                ai_mapping.setdefault(base_name, []).append({
+                    "ai_tool": ai_tool,
+                    "file_id": file["id"]
                 })
 
-        # Save to session
-        st.session_state["wer_results"] = results
-        st.session_state["result_language"] = selected_language
-        st.session_state["result_year"] = selected_year
-        st.session_state["result_month"] = selected_month
+            for original in original_files:
 
-        st.success("Report Generated Successfully!")
+                base_name = os.path.splitext(original["name"])[0]
 
-    except Exception as e:
-        st.error(f"Error generating report: {e}")
+                if base_name not in ai_mapping:
+                    continue
+
+                original_text = parse_srt(
+                    download_file_content(service, original["id"])
+                )
+
+                for ai in ai_mapping[base_name]:
+
+                    ai_text = parse_srt(
+                        download_file_content(service, ai["file_id"])
+                    )
+
+                    wer_score = calculate_wer(original_text, ai_text)["wer"]
+
+                    results.append({
+                        "File Name": base_name,
+                        "AI Tool": ai["ai_tool"],
+                        "WER Score (%)": round(wer_score, 2)
+                    })
+
+            st.session_state["wer_results"] = results
+            st.session_state["result_language"] = selected_language
+            st.session_state["result_year"] = selected_year
+            st.session_state["result_month"] = selected_month
+
+            st.success("Report Generated Successfully!")
+
+        except Exception as e:
+            st.error(f"Error generating report: {e}")
+
 
 # ============================================================
 # DISPLAY RESULTS
 # ============================================================
+
 if "wer_results" in st.session_state:
 
     results = st.session_state["wer_results"]
 
     if results:
-        st.subheader("Detailed Results")
-        st.dataframe(results, use_container_width=True)
 
-        # -------------------------
-        # TOOL STATS CALCULATION
-        # -------------------------
+        st.markdown("""
+        <div class="results-card">
+        <div class="results-title">📊 Detailed Results</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.dataframe(results, use_container_width=True, hide_index=True)
+
+        # TOOL STATS
         tool_stats = {}
+
         for r in results:
             tool_stats.setdefault(r["AI Tool"], []).append(r["WER Score (%)"])
 
         tool_summary = {}
+
         for tool, scores in tool_stats.items():
             tool_summary[tool] = {
                 "Average WER Score": round(sum(scores)/len(scores), 2),
@@ -753,26 +797,59 @@ if "wer_results" in st.session_state:
         best_wer = tool_summary[best_tool]["Average WER Score"]
         worst_wer = tool_summary[worst_tool]["Average WER Score"]
 
-        # -------------------------
-        # SUMMARY DISPLAY
-        # -------------------------
-        st.subheader("Performance Summary")
+        # SUMMARY
+        st.markdown("""
+        <div class="results-card">
+        <div class="results-title">📈 Performance Summary</div>
+        </div>
+        """, unsafe_allow_html=True)
+
         col1, col2, col3 = st.columns(3)
 
-        col1.metric("Best Tool", best_tool, f"{best_wer}%")
-        col2.metric("Worst Tool", worst_tool, f"{worst_wer}%")
-        col3.metric("Total Tools", len(tool_summary))
+        with col1:
+            st.markdown(f"""
+            <div class="summary-card best-card">
+                <div class="summary-title">🏆 Best Tool</div>
+                <div class="summary-value">{best_tool}</div>
+                <p>Avg WER: {best_wer}%</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-        tool_stats_list = [{"AI Tool": tool, **stats}
-                           for tool, stats in tool_summary.items()]
+        with col2:
+            st.markdown(f"""
+            <div class="summary-card worst-card">
+                <div class="summary-title">⚠ Worst Tool</div>
+                <div class="summary-value">{worst_tool}</div>
+                <p>Avg WER: {worst_wer}%</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-        st.subheader("Tool-wise Metrics")
-        st.dataframe(tool_stats_list)
+        with col3:
+            st.markdown(f"""
+            <div class="summary-card total-card">
+                <div class="summary-title">📊 Total Tools</div>
+                <div class="summary-value">{len(tool_summary)}</div>
+                <p>Analyzed</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-        # -------------------------
-        # SAVE TO BACKEND (AFTER CALCULATION)
-        # -------------------------
+        # TOOL METRICS
+        tool_stats_list = [
+            {"AI Tool": tool, **stats}
+            for tool, stats in tool_summary.items()
+        ]
+
+        st.markdown("""
+        <div class="results-card">
+        <div class="results-title">⚙ Tool-wise WER Metrics</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.dataframe(tool_stats_list, use_container_width=True, hide_index=True)
+
+        # SAVE TO BACKEND
         try:
+
             payload = {
                 "language": st.session_state["result_language"],
                 "year": st.session_state["result_year"],
@@ -801,10 +878,9 @@ if "wer_results" in st.session_state:
         except Exception as e:
             st.error(f"Backend Save Failed: {e}")
 
-        # -------------------------
         # CSV DOWNLOAD
-        # -------------------------
         csv_buffer = io.StringIO()
+
         writer = csv.DictWriter(csv_buffer, fieldnames=results[0].keys())
         writer.writeheader()
         writer.writerows(results)
