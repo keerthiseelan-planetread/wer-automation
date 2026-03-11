@@ -1,13 +1,22 @@
-import streamlit as st
-from wer_engine.wer_calculater import calculate_wer
-from config import Config
-from auth.login import login_user, logout_user
-import time
-from wer_engine.srt_parser import parse_srt
-from drive.drive_utils import find_folder, list_srt_files, traverse_structure
-from drive.drive_service import get_drive_service
-from drive.drive_utils import download_file_content
+import sys
 import os
+
+# Ensure workspace root is in Python path for module imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import streamlit as st
+from app.wer_engine.wer_calculater import calculate_wer
+from app.config import Config
+from app.auth.login import login_user, logout_user
+import time
+from app.wer_engine.srt_parser import parse_srt
+from app.drive.drive_utils import find_folder, list_srt_files, traverse_structure
+from app.drive.drive_service import get_drive_service
+from app.drive.drive_utils import download_file_content
+
+# Import incremental processing
+from app.Services.incremental_processor import process_with_incremental_caching, get_processing_summary
+from app.Services.file_matcher import build_ai_mapping, match_original_with_ai
 
 
 # Configure page
@@ -399,103 +408,97 @@ if st.session_state["generating_report"]:
             original_id = original_folder[0]["id"]
             ai_id = ai_folder[0]["id"]
 
-            # 3️⃣ Fetch all SRT files
+            # ⚡ Initialize Database and Process with Incremental Caching
             with status_placeholder.container():
-                st.info("📄 Fetching SRT files...")
+                st.info("🗄️ Checking database for cached results...")
             
-            original_files = list_srt_files(service, original_id)
-            ai_files = list_srt_files(service, ai_id)
-
-            if not original_files:
-                st.warning("⚠️ No Original files found.")
-                st.stop()
-
-            if not ai_files:
-                st.warning("⚠️ No AI files found.")
-                st.stop()
-
-            progress_bar.progress(60)
-
-            # 4️⃣ Build AI Mapping
-            ai_mapping = {}
-
-            for file in ai_files:
-                filename = file["name"]
-                file_id = file["id"]
-
-                name_without_ext = os.path.splitext(filename)[0]
-
-                if "_" not in name_without_ext:
-                    continue
-
-                parts = name_without_ext.split("_")
-
-                base_name, ai_tool = name_without_ext.rsplit("_", 1)
-
-                if base_name not in ai_mapping:
-                    ai_mapping[base_name] = []
-
-                ai_mapping[base_name].append({
-                    "ai_tool": ai_tool,
-                    "file_id": file_id
-                })
-
-            progress_bar.progress(70)
-
-            # 5️⃣ Process Batch
-            with status_placeholder.container():
-                st.info("⚡ Calculating WER scores... Processing files...")
-            
-            results = []
-
-            for original in original_files:
-
-                original_filename = original["name"]
-                base_name = os.path.splitext(original_filename)[0]
-
-                if base_name not in ai_mapping:
-                    continue
-
-                # Download original once
-                original_content = download_file_content(service, original["id"])
-                original_text = parse_srt(original_content)
-
-                for ai in ai_mapping[base_name]:
-
-                    ai_content = download_file_content(service, ai["file_id"])
-                    ai_text = parse_srt(ai_content)
-
-                    wer_result = calculate_wer(original_text, ai_text)
-
-                    wer_score = wer_result["wer"]
-
-                    results.append({
-                        "File Name": base_name,
-                        "AI Tool": ai["ai_tool"],
-                        "WER Score (%)": round(wer_score, 2)
-                    })
-
-            progress_bar.progress(100)
-
-            # Clear progress indicators
-            progress_placeholder.empty()
-            status_placeholder.empty()
-
-            # 6️⃣ Display Results
-            if results:
-                st.toast("WER evaluation report generated successfully!", icon="✅")
-                st.session_state["wer_results"] = results
-                st.session_state["result_language"] = selected_language
-                st.session_state["result_month"] = selected_month
-                st.session_state["result_year"] = selected_year
-                st.session_state["generating_report"] = False
-                st.rerun()
+            try:
+                # Call incremental processor
+                results_raw, processing_info = process_with_incremental_caching(
+                    year=int(selected_year),
+                    month=selected_month,
+                    language=selected_language,
+                    drive_service=service,
+                    original_folder_id=original_id,
+                    ai_generated_folder_id=ai_id,
+                    build_ai_mapping_func=build_ai_mapping,
+                    match_original_with_ai_func=match_original_with_ai,
+                    download_file_content_func=download_file_content
+                )
                 
+                progress_bar.progress(100)
+                
+                # Display processing summary
+                with status_placeholder.container():
+                    if processing_info["status"] == "success":
+                        st.success(
+                            f"✅ Processing complete!\n\n"
+                            f"📊 Results: {processing_info['total_files']} total files\n"
+                            f"🆕 Newly processed: {processing_info['newly_processed']}\n"
+                            f"💾 From cache: {processing_info['cached_files']}\n"
+                            f"⏱️ Processing time: {processing_info['processing_time_seconds']:.2f}s"
+                        )
+                    elif processing_info["status"] == "partial_success":
+                        st.warning(
+                            f"⚠️ Partial success - returning cached results\n"
+                            f"📊 Results: {processing_info['total_files']} files\n"
+                            f"Error: {processing_info['error_message']}"
+                        )
+                    else:
+                        st.error(f"❌ Processing failed: {processing_info['error_message']}")
+                
+                # Format results for display (transform from MongoDB format to display format)
+                results = []
+                for result in results_raw:
+                    if result.get('file_status') != 'archived':  # Skip archived files
+                        wer_score = result.get('wer_score', 0)
+                        # Handle different data types
+                        if isinstance(wer_score, dict):
+                            wer_score = wer_score.get('$numberDouble', wer_score.get('$numberInt', 0))
+                        try:
+                            wer_score = float(wer_score)
+                        except (ValueError, TypeError):
+                            wer_score = 0.0
+                        
+                        results.append({
+                            "File Name": result.get('base_name', 'Unknown'),
+                            "AI Tool": result.get('ai_tool', 'Unknown'),
+                            "WER Score (%)": round(wer_score, 2)
+                        })
+                
+                # Clear progress indicators
+                progress_placeholder.empty()
+                status_placeholder.empty()
+                
+                # Display results if any
+                if results:
+                    st.toast("WER evaluation report generated successfully!", icon="✅")
+                    st.session_state["wer_results"] = results
+                    st.session_state["result_language"] = selected_language
+                    st.session_state["result_month"] = selected_month
+                    st.session_state["result_year"] = selected_year
+                    st.session_state["processing_info"] = processing_info  # Store info for display
+                    st.session_state["generating_report"] = False
+                    st.rerun()
+                else:
+                    st.warning("⚠️ No results to display. The files may have been processed but no WER scores were calculated. Check the terminal logs for details.")
+                    st.session_state["generating_report"] = False
+                    
+            except Exception as e:
+                progress_placeholder.empty()
+                status_placeholder.empty()
+                st.session_state["generating_report"] = False
+                st.error(f"❌ An error occurred during processing: {str(e)}")
+                import traceback
+                st.error(f"Details: {traceback.format_exc()}")
+    
     except Exception as e:
         progress_placeholder.empty()
         status_placeholder.empty()
         st.session_state["generating_report"] = False
-        st.error(f"❌ An error occurred during processing: {str(e)}")
+        st.error(f"❌ Error during report generation: {str(e)}")
+        import traceback
+        st.error(f"Details: {traceback.format_exc()}")
 
 # Display persisted results
 if "wer_results" in st.session_state and st.session_state["wer_results"]:
@@ -507,8 +510,66 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     selected_language = st.session_state.get("result_language", "")
     selected_month = st.session_state.get("result_month", "")
     selected_year = st.session_state.get("result_year", "")
+    processing_info = st.session_state.get("processing_info", {})
     
-    # Display results table using Streamlit's native support
+    # Display processing summary
+    if processing_info:
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "Total Files",
+                processing_info.get("total_files", 0)
+            )
+        
+        with col2:
+            st.metric(
+                "Newly Processed",
+                processing_info.get("newly_processed", 0)
+            )
+        
+        with col3:
+            st.metric(
+                "From Cache",
+                processing_info.get("cached_files", 0)
+            )
+        
+        with col4:
+            st.metric(
+                "Processing Time (s)",
+                f"{processing_info.get('processing_time_seconds', 0):.2f}"
+            )
+    
+    # Display Tool Summary
+    try:
+        tool_summary = get_processing_summary(
+            [
+                {
+                    'base_name': r['File Name'],
+                    'ai_tool': r['AI Tool'],
+                    'wer_score': r['WER Score (%)'],
+                    'file_status': 'current'
+                }
+                for r in results
+            ]
+        )
+        
+        if tool_summary:
+            st.markdown("<h3>AI Tool Performance Summary</h3>", unsafe_allow_html=True)
+            tool_summary_data = []
+            for tool, metrics in tool_summary.items():
+                tool_summary_data.append({
+                    "AI Tool": tool,
+                    "Average WER": f"{metrics['average']:.2f}%",
+                    "Best WER": f"{metrics['best']:.2f}%",
+                    "Worst WER": f"{metrics['worst']:.2f}%",
+                    "Files Count": metrics['count']
+                })
+            st.dataframe(tool_summary_data, use_container_width=True, hide_index=True)
+    except Exception as e:
+        st.warning(f"Could not generate tool summary: {str(e)}")
+    
+    # Display results table
     st.markdown("<h3 style='margin-top: 30px;'>Detailed Results</h3>", unsafe_allow_html=True)
     st.dataframe(results, use_container_width=True, hide_index=True)
 

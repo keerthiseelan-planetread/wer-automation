@@ -4,9 +4,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
+    # Google Drive Configuration
     GOOGLE_DRIVE_ROOT_ID = os.getenv("GOOGLE_DRIVE_ROOT_ID")
     SERVICE_ACCOUNT_PATH = os.getenv("SERVICE_ACCOUNT_PATH")
     ALLOWED_USERS = os.getenv("ALLOWED_USERS")
+
+    # MongoDB Configuration
+    MONGODB_URI = os.getenv("MONGODB_URI")
+    MONGODB_DB_NAME = "wer-automation"
+    
+    # MongoDB Collections
+    MONGODB_COLLECTIONS = {
+        "wer_results": "wer_results",
+        "processing_metadata": "processing_metadata",
+        "tool_summary_metrics": "tool_summary_metrics"
+    }
 
     @staticmethod
     def validate():
@@ -20,6 +32,9 @@ class Config:
 
         if not Config.ALLOWED_USERS:
             missing.append("ALLOWED_USERS")
+
+        if not Config.MONGODB_URI:
+            missing.append("MONGODB_URI")
 
         if missing:
             raise ValueError(f"Missing environment variables: {', '.join(missing)}")
@@ -45,4 +60,3 @@ class Config:
             users_dict[email] = hashed_password
 
         return users_dict
-

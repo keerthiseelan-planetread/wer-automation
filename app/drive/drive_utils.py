@@ -59,6 +59,16 @@ def traverse_structure(service, root_id, year, month, language):
     return language_id
 
 def list_srt_files(service, folder_id):
+    """
+    List all .srt files in a folder (basic info).
+    
+    Args:
+        service: Google Drive API service
+        folder_id: Folder ID to search in
+        
+    Returns:
+        List[Dict]: List of files with id and name
+    """
     query = (
         f"'{folder_id}' in parents "
         f"and trashed = false "
@@ -71,6 +81,66 @@ def list_srt_files(service, folder_id):
     ).execute()
 
     return results.get("files", [])
+
+
+def list_srt_files_with_metadata(service, folder_id):
+    """
+    List all .srt files with metadata for incremental processing.
+    Includes file ID, name, modification time, and size for detecting changes.
+    
+    Args:
+        service: Google Drive API service
+        folder_id: Folder ID to search in
+        
+    Returns:
+        List[Dict]: List of files with id, name, modifiedTime, size, webViewLink, createdTime
+    """
+    import logging
+    from datetime import datetime
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        files = []
+        query = (
+            f"'{folder_id}' in parents "
+            f"and trashed = false "
+            f"and name contains '.srt'"
+        )
+        
+        page_token = None
+        while True:
+            results = service.files().list(
+                q=query,
+                spaces='drive',
+                fields='files(id, name, modifiedTime, size, webViewLink, createdTime)',
+                pageSize=100,
+                pageToken=page_token
+            ).execute()
+            
+            for file in results.get('files', []):
+                # Convert modifiedTime to datetime object for easier comparison
+                modified_time = file.get('modifiedTime')
+                if modified_time:
+                    try:
+                        # Parse ISO format timestamp
+                        file['modified_datetime'] = datetime.fromisoformat(modified_time.replace('Z', '+00:00'))
+                    except Exception as e:
+                        logger.warning(f"Could not parse modifiedTime for {file.get('name')}: {str(e)}")
+                
+                files.append(file)
+            
+            page_token = results.get('nextPageToken')
+            if not page_token:
+                break
+        
+        logger.info(f"Found {len(files)} .srt files with metadata in folder {folder_id}")
+        return files
+        
+    except Exception as error:
+        logger.error(f"Error fetching file metadata: {str(error)}")
+        return []
+
 
 from googleapiclient.http import MediaIoBaseDownload
 import io
