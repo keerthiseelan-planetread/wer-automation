@@ -37,7 +37,8 @@ def process_batch(original_files, ai_files, drive_service):
         for ai in ai_versions:
             try:
                 ai_tool = ai["ai_tool"]
-                ai_content = drive_service.download_file_content(ai["file_id"])
+                ai_file_id = ai["file_id"]
+                ai_content = drive_service.download_file_content(ai_file_id)
                 ai_text = extract_text_from_srt(ai_content)
 
                 wer_score = calculate_wer(original_text, ai_text)
@@ -46,7 +47,8 @@ def process_batch(original_files, ai_files, drive_service):
                     "base_name": base_name,
                     "ai_tool": ai_tool,
                     "wer_score": round(wer_score, 2),
-                    "processed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    "processed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "file_id": ai_file_id  # Track which AI file was processed
                 })
 
                 logging.info(f"WER computed for {base_name} - {ai_tool}: {wer_score}")

@@ -53,6 +53,7 @@ def match_original_with_ai(original_files, ai_mapping):
     ]
     """
     matched = []
+    unmatched_count = 0
 
     for original in original_files:
         filename = original["name"]
@@ -65,6 +66,11 @@ def match_original_with_ai(original_files, ai_mapping):
                 "ai_versions": ai_mapping[base_name]
             })
         else:
-            logging.warning(f"No AI file found for original: {filename}")
+            # Silently track unmatched files - this is expected behavior
+            # Files without AI versions are simply not processed
+            unmatched_count += 1
+    
+    if unmatched_count > 0:
+        logging.debug(f"{unmatched_count} original files have no matching AI files (expected behavior)")
 
     return matched

@@ -185,8 +185,18 @@ def process_with_incremental_caching(
                 raise Exception("Failed to save WER results to MongoDB")
             
             # Update metadata ONLY after WER results are confirmed saved
-            all_processed_ids = [f['id'] for f in current_ai_files]
-            update_success = update_processing_metadata(year, month, language, all_processed_ids)
+            # Extract matched AI file IDs from the WER results (skip unmatched files)
+            processed_ai_file_ids = list(set([
+                result.get('file_id') for result in combined_results 
+                if result.get('file_id') and result.get('file_status') != 'archived'
+            ]))
+            
+            if not processed_ai_file_ids:
+                # Fallback: if file_id not in results, use current_ai_files that were in files_to_process
+                processed_ai_file_ids = [f['id'] for f in files_to_process]
+            
+            logger.info(f"Tracking {len(processed_ai_file_ids)} matched files for this batch")
+            update_success = update_processing_metadata(year, month, language, processed_ai_file_ids)
             
             if not update_success:
                 logger.warning("Failed to update processing metadata")
