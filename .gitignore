@@ -27,3 +27,6 @@ Thumbs.db
 service.account.json
 
 
+FALLBACK_STRATEGY.md
+TESTING_FALLBACK.md
+
