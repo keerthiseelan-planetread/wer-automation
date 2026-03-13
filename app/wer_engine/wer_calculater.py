@@ -47,9 +47,9 @@ def calculate_wer(reference, hypothesis):
     # Same formula: distance / reference word count
     wer = distance / len(ref_words) if len(ref_words) > 0 else 0
 
+    # Cap at 100% - values above 100% are not meaningful as a percentage
+    wer = min(wer, 1.0)
+
     return {
         "wer": wer * 100,   # percentage (same as your code)
-        # "refWordCount": len(ref_words),
-        # "hypWordCount": len(hyp_words),
-        # "distance": distance
     }

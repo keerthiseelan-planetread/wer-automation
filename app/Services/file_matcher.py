@@ -24,15 +24,18 @@ def build_ai_mapping(ai_files):
             logging.warning(f"Invalid AI filename format: {filename}")
             continue
 
-        parts = name_without_ext.split("_")
+        # Split on LAST underscore: "Bhagi_di_dhee_whisper" → base="Bhagi_di_dhee", tool="whisper"
+        last_underscore = name_without_ext.rfind("_")
+        base_name = name_without_ext[:last_underscore]
+        ai_tool = name_without_ext[last_underscore + 1:]
+        
+        # Normalize to lowercase for case-insensitive matching
+        base_name_key = base_name.lower()
 
-        base_name = parts[0]
-        ai_tool = "_".join(parts[1:])  # Handles multi-word tool names
+        if base_name_key not in mapping:
+            mapping[base_name_key] = []
 
-        if base_name not in mapping:
-            mapping[base_name] = []
-
-        mapping[base_name].append({
+        mapping[base_name_key].append({
             "ai_tool": ai_tool,
             "file_id": file_id,
             "filename": filename
@@ -58,12 +61,13 @@ def match_original_with_ai(original_files, ai_mapping):
     for original in original_files:
         filename = original["name"]
         base_name = os.path.splitext(filename)[0]
+        base_name_key = base_name.lower()  # case-insensitive lookup
 
-        if base_name in ai_mapping:
+        if base_name_key in ai_mapping:
             matched.append({
                 "base_name": base_name,
                 "original_file": original,
-                "ai_versions": ai_mapping[base_name]
+                "ai_versions": ai_mapping[base_name_key]
             })
         else:
             # Silently track unmatched files - this is expected behavior

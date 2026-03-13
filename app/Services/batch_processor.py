@@ -48,7 +48,7 @@ def process_batch(original_files, ai_files, drive_service):
                     "ai_tool": ai_tool,
                     "wer_score": round(wer_score, 2),
                     "processed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "file_id": ai_file_id  # Track which AI file was processed
+                    "google_drive_file_id": ai_file_id  # Track which AI file was processed
                 })
 
                 logging.info(f"WER computed for {base_name} - {ai_tool}: {wer_score}")

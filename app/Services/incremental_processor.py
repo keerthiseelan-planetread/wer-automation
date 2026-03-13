@@ -185,18 +185,30 @@ def process_with_incremental_caching(
                 raise Exception("Failed to save WER results to MongoDB")
             
             # Update metadata ONLY after WER results are confirmed saved
-            # Extract matched AI file IDs from the WER results (skip unmatched files)
-            processed_ai_file_ids = list(set([
-                result.get('file_id') for result in combined_results 
-                if result.get('file_id') and result.get('file_status') != 'archived'
-            ]))
+            # IMPORTANT: Accumulate file IDs cumulatively
+            # 1. Start with previously cached IDs (base set of processed files)
+            # 2. Add newly processed file IDs
+            # 3. Remove any deleted file IDs
             
-            if not processed_ai_file_ids:
-                # Fallback: if file_id not in results, use current_ai_files that were in files_to_process
-                processed_ai_file_ids = [f['id'] for f in files_to_process]
+            tracked_file_ids = set(cached_file_ids or [])
             
-            logger.info(f"Tracking {len(processed_ai_file_ids)} matched files for this batch")
-            update_success = update_processing_metadata(year, month, language, processed_ai_file_ids)
+            # Add file IDs from newly processed results
+            for result in new_wer_results:
+                if result.get('google_drive_file_id'):
+                    tracked_file_ids.add(result['google_drive_file_id'])
+            
+            # Remove deleted files
+            tracked_file_ids.difference_update(deleted_file_ids or [])
+            
+            # Validate: ensure all tracked IDs still exist in current files
+            all_current_file_ids = set([f['id'] for f in current_ai_files])
+            final_tracked_ids = list(tracked_file_ids & all_current_file_ids)
+            
+            logger.info(
+                f"Metadata update: tracking {len(final_tracked_ids)} total files "
+                f"(previously: {len(cached_file_ids)}, newly processed: {len(new_wer_results)}, deleted: {len(deleted_file_ids or [])})"
+            )
+            update_success = update_processing_metadata(year, month, language, final_tracked_ids)
             
             if not update_success:
                 logger.warning("Failed to update processing metadata")
@@ -298,6 +310,9 @@ def _calculate_wer_for_files(
             try:
                 original_content = download_file_content_func(drive_service, original_file['id'])
                 original_text = parse_srt(original_content)
+                if not original_text.strip():
+                    logger.warning(f"Original file {base_name} parsed to empty text - skipping")
+                    continue
             except Exception as e:
                 logger.warning(f"Could not process original file {base_name}: {str(e)}")
                 continue
@@ -311,6 +326,10 @@ def _calculate_wer_for_files(
                     # Download and parse AI file
                     ai_content = download_file_content_func(drive_service, ai_file_id)
                     ai_text = parse_srt(ai_content)
+                    
+                    if not ai_text.strip():
+                        logger.warning(f"AI file {base_name} ({ai_tool}) parsed to empty text - skipping")
+                        continue
                     
                     # Calculate WER - returns dict {"wer": score}
                     wer_result = calculate_wer(original_text, ai_text)

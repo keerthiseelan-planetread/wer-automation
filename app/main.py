@@ -278,7 +278,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     # Logout button
-    if st.button("Logout", use_container_width=True, key="logout_btn"):
+    if st.button("Logout", width='stretch', key="logout_btn"):
         logout_user()
     
     st.markdown("---")
@@ -354,7 +354,7 @@ with col4:
     
     generate_clicked = st.button(
         button_text, 
-        use_container_width=True, 
+        width='stretch', 
         key="generate_btn",
         disabled=button_disabled
     )
@@ -554,24 +554,13 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
             ]
         )
         
-        if tool_summary:
-            st.markdown("<h3>AI Tool Performance Summary</h3>", unsafe_allow_html=True)
-            tool_summary_data = []
-            for tool, metrics in tool_summary.items():
-                tool_summary_data.append({
-                    "AI Tool": tool,
-                    "Average WER": f"{metrics['average']:.2f}%",
-                    "Best WER": f"{metrics['best']:.2f}%",
-                    "Worst WER": f"{metrics['worst']:.2f}%",
-                    "Files Count": metrics['count']
-                })
-            st.dataframe(tool_summary_data, use_container_width=True, hide_index=True)
+        pass
     except Exception as e:
         st.warning(f"Could not generate tool summary: {str(e)}")
     
     # Display results table
     st.markdown("<h3 style='margin-top: 30px;'>Detailed Results</h3>", unsafe_allow_html=True)
-    st.dataframe(results, use_container_width=True, hide_index=True)
+    st.dataframe(results, width='stretch', hide_index=True)
 
     # Export option - create CSV from results list
     import csv
@@ -672,39 +661,35 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
         </div>
         """, unsafe_allow_html=True)
     
-    # Display tool-wise average WER table
-    st.markdown("<h3 style='margin-top: 30px;'>Tool-wise WER Metrics</h3>", unsafe_allow_html=True)
-    
-    # Convert tool_summary dict to list of dicts for proper dataframe display
-    tool_stats_list = [{"AI Tool": tool, **stats} for tool, stats in tool_summary.items()]
-    st.dataframe(tool_stats_list, use_container_width=True, hide_index=True)
-    
-    # Download tool-wise metrics - create CSV string
-    csv_lines = ["AI Tool,Average WER Score,Best WER Score,Worst WER Score"]
-    for tool, stats in tool_summary.items():
-        csv_lines.append(f"{tool},{stats['Average WER Score']},{stats['Best WER Score']},{stats['Worst WER Score']}")
-    tool_metrics_csv = "\n".join(csv_lines)
-    
-    # Download tool metrics button with callback
-    def mark_metrics_download_clicked():
-        st.session_state["metrics_download_clicked"] = True
-    
-    st.download_button(
-        label="📥 Download Tool Metrics as CSV",
-        data=tool_metrics_csv,
-        file_name=f"wer_tool_metrics_{selected_language}_{selected_month}_{selected_year}.csv",
-        mime="text/csv",
-        on_click=mark_metrics_download_clicked
-    )
-    
-    # Show success message after download
-    if st.session_state.get("metrics_download_clicked"):
-        col1, col2 = st.columns([20, 1])
-        with col1:
-            st.success("✅ Download completed successfully!")
-        with col2:
-            if st.button("✕", key="close_metrics_msg", help="Close message"):
-                st.session_state["metrics_download_clicked"] = False
-                st.rerun()
+    # AI Tool WER Metrics Section
+    if tool_summary:
+        st.markdown("<h3 style='margin-top: 30px;'>AI Tool WER Metrics</h3>", unsafe_allow_html=True)
+        tool_summary_data = []
+        for tool, metrics in tool_summary.items():
+            tool_summary_data.append({
+                "AI Tool": tool,
+                "Average WER Score": metrics['Average WER Score'],
+                "Best WER Score": metrics['Best WER Score'],
+                "Worst WER Score": metrics['Worst WER Score']
+            })
+        st.dataframe(tool_summary_data, width='stretch', hide_index=True)
+        
+        # Download button for AI Tool Performance Summary
+        import csv
+        import io
+        
+        csv_buffer = io.StringIO()
+        writer = csv.DictWriter(csv_buffer, fieldnames=["AI Tool", "Average WER Score", "Best WER Score", "Worst WER Score"])
+        writer.writeheader()
+        writer.writerows(tool_summary_data)
+        summary_csv_content = csv_buffer.getvalue()
+        
+        st.download_button(
+            label="📥 Download AI Tool WER Metrics",
+            data=summary_csv_content,
+            file_name=f"ai_tool_wer_metrics_{selected_language}_{selected_month}_{selected_year}.csv",
+            mime="text/csv",
+            key="download_summary_btn"
+        )
     
     

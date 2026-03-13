@@ -157,6 +157,12 @@ def download_file_content(service, file_id):
         status, done = downloader.next_chunk()
 
     file_stream.seek(0)
-    return file_stream.read().decode("utf-8")
+    raw_bytes = file_stream.read()
+    
+    # Try UTF-8 first, fall back to latin-1 (covers Windows-1252 too)
+    try:
+        return raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw_bytes.decode("latin-1")
 
 
