@@ -371,7 +371,7 @@ def _calculate_wer_for_files(
         logger.info(f"Found {len(matched_pairs)} matched file pairs")
         
         if not matched_pairs:
-            logger.warning("No matched file pairs found - check your Original and AI file naming")
+            logger.info("No matched file pairs found - no files to process for these parameters")
             return wer_results
         # Calculate WER for each pair
         for pair in matched_pairs:
