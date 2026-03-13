@@ -2,11 +2,18 @@
 showErrorDetails = false
 toolbarMode = "minimal"
 showSidebarNavigation = false
+maxMessageSize = 200
 
 [server]
 port = 8501
 headless = true
 runOnSave = true
+maxUploadSize = 200
+enableXsrfProtection = true
+enableCORS = false
 
 [logger]
 level = "info"
+
+[browser]
+gatherUsageStats = false

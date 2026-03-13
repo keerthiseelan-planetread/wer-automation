@@ -370,7 +370,6 @@ if st.session_state.get("processing_error"):
 if generate_clicked:
     st.session_state["processing_error"] = None  # Clear error on new attempt
     st.session_state["generating_report"] = True
-    st.rerun()
 
 if st.session_state["generating_report"]:
     service = get_drive_service()
@@ -409,7 +408,8 @@ if st.session_state["generating_report"]:
             st.session_state["processing_error"] = "❌ Original or AI folder missing. Please check your drive structure."
             # Clear old results so they don't display with the error
             st.session_state.pop("wer_results", None)
-            st.rerun()
+            st.error(st.session_state["processing_error"])
+            st.stop()
 
         progress_bar.progress(40)
 
@@ -631,7 +631,6 @@ if st.session_state.get("show_results", False) and "wer_results" in st.session_s
         with col2:
             if st.button("✕", key="close_download_msg", help="Close message"):
                 st.session_state["download_clicked"] = False
-                st.rerun()
 
     
     # Calculate tool-wise statistics using native Python
@@ -740,4 +739,3 @@ if st.session_state.get("show_results", False) and "wer_results" in st.session_s
             with col2:
                 if st.button("✕", key="close_metrics_download_msg", help="Close message"):
                     st.session_state["metrics_download_clicked"] = False
-                    st.rerun()
