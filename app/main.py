@@ -247,6 +247,9 @@ if "authenticated" not in st.session_state:
 if "generating_report" not in st.session_state:
     st.session_state["generating_report"] = False
 
+if "show_results" not in st.session_state:
+    st.session_state["show_results"] = False
+
 # If not logged in → show login
 if not st.session_state["authenticated"]:
     login_user()
@@ -361,6 +364,16 @@ with col4:
 
 # Processing and results
 if generate_clicked:
+    # Clear old results from session state before generating new report
+    st.session_state.pop("wer_results", None)
+    st.session_state.pop("result_language", None)
+    st.session_state.pop("result_month", None)
+    st.session_state.pop("result_year", None)
+    st.session_state.pop("processing_info", None)
+    st.session_state.pop("download_clicked", None)
+    st.session_state.pop("metrics_download_clicked", None)
+    st.session_state["show_results"] = False  # Hide results while generating
+    
     st.session_state["generating_report"] = True
     st.rerun()
 
@@ -499,16 +512,19 @@ if st.session_state["generating_report"]:
                     st.session_state["result_month"] = selected_month
                     st.session_state["result_year"] = selected_year
                     st.session_state["processing_info"] = processing_info  # Store info for display
+                    st.session_state["show_results"] = True  # Enable results display
                     st.session_state["generating_report"] = False
                     st.rerun()
                 else:
                     st.warning("⚠️ No results to display. The files may have been processed but no WER scores were calculated. Check the terminal logs for details.")
                     st.session_state["generating_report"] = False
+                    st.session_state["show_results"] = False
                     
             except Exception as e:
                 progress_placeholder.empty()
                 status_placeholder.empty()
                 st.session_state["generating_report"] = False
+                st.session_state["show_results"] = False
                 st.error(f"❌ An error occurred during processing: {str(e)}")
                 import traceback
                 st.error(f"Details: {traceback.format_exc()}")
@@ -517,12 +533,13 @@ if st.session_state["generating_report"]:
         progress_placeholder.empty()
         status_placeholder.empty()
         st.session_state["generating_report"] = False
+        st.session_state["show_results"] = False
         st.error(f"❌ Error during report generation: {str(e)}")
         import traceback
         st.error(f"Details: {traceback.format_exc()}")
 
-# Display persisted results
-if "wer_results" in st.session_state and st.session_state["wer_results"]:
+# Display persisted results - only if show_results flag is True
+if st.session_state.get("show_results", False) and "wer_results" in st.session_state and st.session_state["wer_results"]:
     # Initialize download state
     if "download_clicked" not in st.session_state:
         st.session_state["download_clicked"] = False
@@ -726,5 +743,3 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
                 if st.button("✕", key="close_metrics_download_msg", help="Close message"):
                     st.session_state["metrics_download_clicked"] = False
                     st.rerun()
-    
-    
