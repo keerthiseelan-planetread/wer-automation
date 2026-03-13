@@ -684,12 +684,26 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
         writer.writerows(tool_summary_data)
         summary_csv_content = csv_buffer.getvalue()
         
+        def mark_metrics_download_clicked():
+            st.session_state["metrics_download_clicked"] = True
+        
         st.download_button(
             label="📥 Download AI Tool WER Metrics",
             data=summary_csv_content,
             file_name=f"ai_tool_wer_metrics_{selected_language}_{selected_month}_{selected_year}.csv",
             mime="text/csv",
-            key="download_summary_btn"
+            key="download_summary_btn",
+            on_click=mark_metrics_download_clicked
         )
+        
+        # Show success message after download
+        if st.session_state.get("metrics_download_clicked"):
+            col1, col2 = st.columns([20, 1])
+            with col1:
+                st.success("✅ Download completed successfully!")
+            with col2:
+                if st.button("✕", key="close_metrics_download_msg", help="Close message"):
+                    st.session_state["metrics_download_clicked"] = False
+                    st.rerun()
     
     
