@@ -1,4 +1,4 @@
-"""Incremental report processing with MongoDB caching."""
+"""Incremental report processing with MongoDB caching and local fallback."""
 
 import logging
 from typing import List, Dict, Tuple, Optional
@@ -18,6 +18,11 @@ from app.database.init_db import initialize_database
 from app.drive.drive_utils import list_srt_files_with_metadata
 from app.wer_engine.srt_parser import parse_srt
 from app.wer_engine.wer_calculater import calculate_wer
+from app.Services.local_cache_manager import (
+    load_results_from_local_cache,
+    save_results_to_local_cache,
+    get_cache_stats
+)
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +187,18 @@ def process_with_incremental_caching(
             logger.info(f"Save result: {save_success}")
             
             if not save_success:
-                raise Exception("Failed to save WER results to MongoDB")
+                logger.warning("Failed to save to MongoDB, but will continue with local cache backup")
+            
+            # ===== ALWAYS save to local cache as backup (regardless of MongoDB success) =====
+            logger.info(f"Saving {len(combined_results)} results to local JSON cache as backup...")
+            try:
+                local_cache_success = save_results_to_local_cache(year, month, language, combined_results)
+                if local_cache_success:
+                    logger.info("✅ Results saved to local cache successfully")
+                else:
+                    logger.warning("Could not save to local cache")
+            except Exception as cache_error:
+                logger.warning(f"Local cache backup failed: {str(cache_error)}")
             
             # Update metadata ONLY after WER results are confirmed saved
             # IMPORTANT: Accumulate file IDs cumulatively
@@ -247,18 +263,75 @@ def process_with_incremental_caching(
         processing_info["status"] = "error"
         processing_info["error_message"] = str(e)
         
-        # Fallback: Try to return cached results if available
+        # ===== FALLBACK LAYER 1: Try to return cached results from MongoDB =====
+        logger.info("Fallback Layer 1: Attempting to retrieve MongoDB cached results...")
         try:
-            logger.info("Attempting to return cached results as fallback...")
             cached_results = get_all_results_for_parameters(year, month, language)
             if cached_results:
-                logger.info(f"Returning {len(cached_results)} cached results")
-                processing_info["status"] = "partial_success"
+                logger.info(f"✅ Fallback Layer 1 SUCCESS: Returning {len(cached_results)} MongoDB cached results")
+                processing_info["status"] = "partial_success_mongodb_cache"
                 processing_info["total_files"] = len(cached_results)
                 return cached_results, processing_info
-        except Exception as fallback_error:
-            logger.error(f"Fallback also failed: {str(fallback_error)}")
+        except Exception as fallback1_error:
+            logger.warning(f"Fallback Layer 1 failed: {str(fallback1_error)}")
         
+        # ===== FALLBACK LAYER 2: Try to return cached results from local JSON cache =====
+        logger.info("Fallback Layer 2: Attempting to retrieve local JSON cached results...")
+        try:
+            local_cached_results = load_results_from_local_cache(year, month, language)
+            if local_cached_results:
+                logger.info(f"✅ Fallback Layer 2 SUCCESS: Returning {len(local_cached_results)} local cached results")
+                processing_info["status"] = "partial_success_local_cache"
+                processing_info["total_files"] = len(local_cached_results)
+                return local_cached_results, processing_info
+        except Exception as fallback2_error:
+            logger.warning(f"Fallback Layer 2 failed: {str(fallback2_error)}")
+        
+        # ===== FALLBACK LAYER 3: Fresh Calculation (process without caching) =====
+        logger.info("Fallback Layer 3: Attempting fresh calculation without cached data...")
+        try:
+            # Get current files and process them fresh
+            current_ai_files = list_srt_files_with_metadata(drive_service, ai_generated_folder_id)
+            original_files = list_srt_files_with_metadata(drive_service, original_folder_id)
+            
+            logger.info(f"Fresh calculation: Found {len(current_ai_files)} AI files and {len(original_files)} original files")
+            
+            fresh_results = _calculate_wer_for_files(
+                current_ai_files,
+                original_files,
+                drive_service,
+                build_ai_mapping_func,
+                match_original_with_ai_func,
+                download_file_content_func
+            )
+            
+            if fresh_results:
+                logger.info(f"✅ Fallback Layer 3 SUCCESS: Generated {len(fresh_results)} fresh results (without caching)")
+                
+                # Try to save to local cache for next time
+                try:
+                    save_results_to_local_cache(year, month, language, fresh_results)
+                    logger.info("Fresh results also saved to local cache for offline access")
+                except Exception as cache_save_error:
+                    logger.warning(f"Could not save fresh results to local cache: {str(cache_save_error)}")
+                
+                processing_info["status"] = "fresh_calculation_no_cache"
+                processing_info["total_files"] = len(fresh_results)
+                processing_info["newly_processed"] = len(fresh_results)
+                processing_info["cached_files"] = 0
+                return fresh_results, processing_info
+                
+        except Exception as fallback3_error:
+            logger.error(f"Fallback Layer 3 also failed: {str(fallback3_error)}", exc_info=True)
+        
+        # ===== ALL FALLBACKS EXHAUSTED =====
+        logger.error("❌ All fallback layers exhausted - cannot generate report")
+        processing_info["status"] = "critical_failure"
+        processing_info["error_message"] = (
+            f"Primary error: {str(e)}\n"
+            "All fallback layers failed. "
+            "Please check: 1) MongoDB connection, 2) Google Drive access, 3) File permissions"
+        )
         return [], processing_info
 
 

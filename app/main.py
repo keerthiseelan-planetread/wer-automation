@@ -438,11 +438,32 @@ if st.session_state["generating_report"]:
                             f"💾 From cache: {processing_info['cached_files']}\n"
                             f"⏱️ Processing time: {processing_info['processing_time_seconds']:.2f}s"
                         )
-                    elif processing_info["status"] == "partial_success":
+                    elif processing_info["status"] == "partial_success_mongodb_cache":
                         st.warning(
-                            f"⚠️ Partial success - returning cached results\n"
-                            f"📊 Results: {processing_info['total_files']} files\n"
-                            f"Error: {processing_info['error_message']}"
+                            f"⚠️ Using MongoDB cached results (processing failed)\n"
+                            f"📊 Results: {processing_info['total_files']} files from database cache\n"
+                            f"📝 Note: Results are from previous successful run"
+                        )
+                    elif processing_info["status"] == "partial_success_local_cache":
+                        st.warning(
+                            f"⚠️ Using local cached results (MongoDB unavailable)\n"
+                            f"📊 Results: {processing_info['total_files']} files from local backup\n"
+                            f"📝 Note: Results are from previous successful run"
+                        )
+                    elif processing_info["status"] == "fresh_calculation_no_cache":
+                        st.warning(
+                            f"⚠️ Fresh calculation (no caching available)\n"
+                            f"📊 Results: {processing_info['total_files']} files calculated fresh\n"
+                            f"💾 Results saved to local backup for offline access"
+                        )
+                    elif processing_info["status"] == "critical_failure":
+                        st.error(
+                            f"❌ Report generation failed:\n"
+                            f"{processing_info['error_message']}\n\n"
+                            f"Troubleshooting:\n"
+                            f"1. Check MongoDB connection\n"
+                            f"2. Verify Google Drive access\n"
+                            f"3. Check file permissions"
                         )
                     else:
                         st.error(f"❌ Processing failed: {processing_info['error_message']}")

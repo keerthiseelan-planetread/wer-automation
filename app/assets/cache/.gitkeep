@@ -1,0 +1,2 @@
+# This directory stores local JSON cache for offline/fallback support
+# It allows reports to be generated even if MongoDB is unavailable
