@@ -247,6 +247,9 @@ if "authenticated" not in st.session_state:
 if "generating_report" not in st.session_state:
     st.session_state["generating_report"] = False
 
+if "processing_error" not in st.session_state:
+    st.session_state["processing_error"] = None
+
 # If not logged in → show login
 if not st.session_state["authenticated"]:
     login_user()
@@ -278,7 +281,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     # Logout button
-    if st.button("Logout", width='stretch', key="logout_btn"):
+    if st.button("Logout", use_container_width=True, key="logout_btn"):
         logout_user()
     
     st.markdown("---")
@@ -354,13 +357,18 @@ with col4:
     
     generate_clicked = st.button(
         button_text, 
-        width='stretch', 
+        use_container_width=True, 
         key="generate_btn",
         disabled=button_disabled
     )
 
+# Display any stored processing error
+if st.session_state.get("processing_error"):
+    st.error(st.session_state["processing_error"])
+
 # Processing and results
 if generate_clicked:
+    st.session_state["processing_error"] = None  # Clear error on new attempt
     st.session_state["generating_report"] = True
     st.rerun()
 
@@ -397,8 +405,11 @@ if st.session_state["generating_report"]:
         if not original_folder or not ai_folder:
             status_placeholder.empty()
             progress_placeholder.empty()
-            st.error("❌ Original or AI folder missing. Please check your drive structure.")
-            st.stop()
+            st.session_state["generating_report"] = False
+            st.session_state["processing_error"] = "❌ Original or AI folder missing. Please check your drive structure."
+            # Clear old results so they don't display with the error
+            st.session_state.pop("wer_results", None)
+            st.rerun()
 
         progress_bar.progress(40)
 
@@ -581,7 +592,7 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
     
     # Display results table
     st.markdown("<h3 style='margin-top: 30px;'>Detailed Results</h3>", unsafe_allow_html=True)
-    st.dataframe(results, width='stretch', hide_index=True)
+    st.dataframe(results, use_container_width=True, hide_index=True)
 
     # Export option - create CSV from results list
     import csv
@@ -693,7 +704,7 @@ if "wer_results" in st.session_state and st.session_state["wer_results"]:
                 "Best WER Score": metrics['Best WER Score'],
                 "Worst WER Score": metrics['Worst WER Score']
             })
-        st.dataframe(tool_summary_data, width='stretch', hide_index=True)
+        st.dataframe(tool_summary_data, use_container_width=True, hide_index=True)
         
         # Download button for AI Tool Performance Summary
         import csv
