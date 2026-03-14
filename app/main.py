@@ -339,20 +339,19 @@ months = [
 col1, col2, col3, col4 = st.columns([1, 1, 1, 1.2])
 
 with col1:
-    selected_language = st.selectbox("🌐 Language", languages, key="language_select")
+    selected_language = st.selectbox("🌐 Language", languages, key="language_select", on_change=lambda: st.session_state.pop("processing_error", None))
 
 with col2:
-    selected_year = st.selectbox("📅 Year", years, key="year_select")
+    selected_year = st.selectbox("📅 Year", years, key="year_select", on_change=lambda: st.session_state.pop("processing_error", None))
 
 with col3:
-    selected_month = st.selectbox("📆 Month", months, key="month_select")
+    selected_month = st.selectbox("📆 Month", months, key="month_select", on_change=lambda: st.session_state.pop("processing_error", None))
 
 with col4:
     st.markdown("<p style='font-size: 12px; color: #6b7280; font-weight: 600;'>Action</p>", unsafe_allow_html=True)
     
-    # Determine button text and disabled state
-    has_results = "wer_results" in st.session_state and st.session_state["wer_results"]
-    button_text = "🔄 Generate Report Again" if has_results else "🔄 Generate Report"
+    # Determine button disabled state (disable during processing)
+    button_text = "🔄 Generate Report"
     button_disabled = st.session_state["generating_report"]
     
     generate_clicked = st.button(
@@ -370,6 +369,7 @@ if st.session_state.get("processing_error"):
 if generate_clicked:
     st.session_state["processing_error"] = None  # Clear error on new attempt
     st.session_state["generating_report"] = True
+    st.rerun()  # Fresh rerun to clear error display and start processing
 
 if st.session_state["generating_report"]:
     service = get_drive_service()
@@ -408,8 +408,7 @@ if st.session_state["generating_report"]:
             st.session_state["processing_error"] = "❌ Original or AI folder missing. Please check your drive structure."
             # Clear old results so they don't display with the error
             st.session_state.pop("wer_results", None)
-            st.error(st.session_state["processing_error"])
-            st.stop()
+            st.rerun()  # Rerun to display error with button enabled
 
         progress_bar.progress(40)
 
@@ -494,7 +493,7 @@ if st.session_state["generating_report"]:
                         
                         results.append({
                             "File Name": result.get('base_name', 'Unknown'),
-                            "AI Tool": result.get('ai_tool', 'Unknown'),
+                            "AI Tool": result.get('ai_tool', 'Unknown').title(),  # Normalize to Title Case
                             "WER Score (%)": round(wer_score, 2)
                         })
                 
@@ -543,6 +542,11 @@ if st.session_state.get("show_results", False) and "wer_results" in st.session_s
         st.session_state["download_clicked"] = False
     
     results = st.session_state["wer_results"]
+    # Normalize AI Tool names to Title Case for consistency
+    for result in results:
+        if 'AI Tool' in result:
+            result['AI Tool'] = result['AI Tool'].title()
+    
     selected_language = st.session_state.get("result_language", "")
     selected_month = st.session_state.get("result_month", "")
     selected_year = st.session_state.get("result_year", "")
@@ -582,7 +586,7 @@ if st.session_state.get("show_results", False) and "wer_results" in st.session_s
             [
                 {
                     'base_name': r['File Name'],
-                    'ai_tool': r['AI Tool'],
+                    'ai_tool': r['AI Tool'].title(),  # Normalize to Title Case
                     'wer_score': r['WER Score (%)'],
                     'file_status': 'current'
                 }

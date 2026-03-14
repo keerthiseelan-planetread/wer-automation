@@ -27,7 +27,7 @@ def build_ai_mapping(ai_files):
         # Split on LAST underscore: "Bhagi_di_dhee_whisper" → base="Bhagi_di_dhee", tool="whisper"
         last_underscore = name_without_ext.rfind("_")
         base_name = name_without_ext[:last_underscore]
-        ai_tool = name_without_ext[last_underscore + 1:]
+        ai_tool = name_without_ext[last_underscore + 1:].lower()  # Normalize to lowercase
         
         # Normalize to lowercase for case-insensitive matching
         base_name_key = base_name.lower()

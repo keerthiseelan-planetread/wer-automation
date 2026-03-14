@@ -492,11 +492,13 @@ def get_processing_summary(results: List[Dict]) -> Dict:
         summary[ai_tool]['count'] += 1
     
     # Calculate statistics
+    result_summary = {}
     for tool in summary:
         scores = summary[tool]['scores']
-        summary[tool]['average'] = sum(scores) / len(scores) if scores else 0
-        summary[tool]['best'] = min(scores) if scores else 0
-        summary[tool]['worst'] = max(scores) if scores else 0
-        del summary[tool]['scores']  # Remove raw scores from output
+        result_summary[tool] = {
+            'Average WER Score': sum(scores) / len(scores) if scores else 0,
+            'Best WER Score': min(scores) if scores else 0,
+            'Worst WER Score': max(scores) if scores else 0,
+        }
     
-    return summary
+    return result_summary

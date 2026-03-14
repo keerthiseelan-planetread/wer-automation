@@ -87,6 +87,9 @@ def save_wer_results(year: int, month: str, language: str,
                 result['processed_timestamp'] = datetime.utcnow()
             if 'file_status' not in result:
                 result['file_status'] = 'current'
+            # Normalize ai_tool to Title Case for consistency
+            if 'ai_tool' in result:
+                result['ai_tool'] = result['ai_tool'].lower().title()
         
         wer_doc = {
             "parameter_hash": param_hash,
