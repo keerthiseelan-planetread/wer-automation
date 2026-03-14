@@ -1,6 +1,8 @@
 """Health check module for external service validation."""
 
 import logging
+import os
+import json
 from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,19 @@ def check_google_drive_credentials() -> Tuple[bool, str]:
         
         logger.info("Checking Google Drive credentials...")
         
+        # First check if service account file exists
+        if not os.path.exists(Config.SERVICE_ACCOUNT_PATH):
+            return False, f"Service account file not found at: {Config.SERVICE_ACCOUNT_PATH}"
+        
+        # Check if it's valid JSON
+        try:
+            with open(Config.SERVICE_ACCOUNT_PATH, 'r') as f:
+                json.load(f)
+        except json.JSONDecodeError as e:
+            return False, f"Service account file is not valid JSON: {str(e)}"
+        except Exception as e:
+            return False, f"Cannot read service account file: {str(e)}"
+        
         # Try to instantiate drive service
         service = get_drive_service()
         
@@ -56,7 +71,7 @@ def check_google_drive_credentials() -> Tuple[bool, str]:
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Google Drive credential check failed: {error_msg}")
-        return False, f"Google Drive authentication failed: {error_msg[:100]}"
+        return False, f"Google Drive connection failed: {error_msg[:100]}"
 
 
 def check_allowed_users() -> Tuple[bool, str]:
@@ -98,13 +113,13 @@ def run_startup_health_checks() -> Dict[str, Tuple[bool, str]]:
     
     results = {}
     
-    # Check MongoDB
+    # Check MongoDB (non-blocking - has fallback layers)
     results["MongoDB"] = check_mongodb_connection()
     
-    # Check Google Drive
+    # Check Google Drive (warning only - cached data still accessible)
     results["Google Drive"] = check_google_drive_credentials()
     
-    # Check Users Configuration
+    # Check Users Configuration (blocking - needed for login)
     results["Users Configuration"] = check_allowed_users()
     
     # Summary
@@ -118,7 +133,7 @@ def run_startup_health_checks() -> Dict[str, Tuple[bool, str]]:
     return results
 
 
-def format_health_check_results(results: Dict[str, Tuple[bool, str]]) -> str:
+def format_health_check_results(results: Dict[str, Tuple[bool, str]]) -> tuple:
     """
     Format health check results for UI display.
     
@@ -126,28 +141,46 @@ def format_health_check_results(results: Dict[str, Tuple[bool, str]]) -> str:
         results: Dictionary of health check results
         
     Returns:
-        str: Formatted message for display
-    """
-    message_lines = []
-    
-    unhealthy_services = []
-    for service, (is_healthy, message) in results.items():
-        if not is_healthy:
-            unhealthy_services.append(f"• {service}: {message}")
-    
-    if unhealthy_services:
-        message_lines.append("⚠️ **Startup Health Check Issues:**\n")
-        message_lines.extend(unhealthy_services)
-        message_lines.append("\n**Troubleshooting Steps:**")
-        message_lines.append("1. Verify `.env` file has all required variables:")
-        message_lines.append("   - GOOGLE_DRIVE_ROOT_ID")
-        message_lines.append("   - SERVICE_ACCOUNT_PATH")
-        message_lines.append("   - ALLOWED_USERS (format: email:hash,email:hash)")
-        message_lines.append("   - MONGODB_URI")
-        message_lines.append("2. Check that service account file exists and is valid JSON")
-        message_lines.append("3. Verify MongoDB connection string is correct")
-        message_lines.append("4. Ensure Google Drive service account has proper permissions")
+        tuple: (blocking_errors, warning_message)
         
-        return "\n".join(message_lines)
+    Blocking: Critical services (Users, cached data accessible)
+    Warnings: Degraded services (Drive down, but reports still viewable)
+    """
+    critical_failures = []
+    warnings = []
     
-    return None  # All healthy
+    # MongoDB failures are non-blocking (has fallback layers)
+    if "MongoDB" in results and not results["MongoDB"][0]:
+        warnings.append(f"⚠️ {results['MongoDB'][1]}")
+        warnings.append("   → Using local cache fallback")
+    
+    # Google Drive failures are now non-blocking (cached data still accessible)
+    if "Google Drive" in results and not results["Google Drive"][0]:
+        warnings.append(f"⚠️ Drive connection issue: {results['Google Drive'][1]}")
+        warnings.append("   → Viewing cached reports only. Unable to generate new reports.")
+    
+    # Users config failures are blocking (needed for login)
+    if "Users Configuration" in results and not results["Users Configuration"][0]:
+        critical_failures.append(f"❌ Users: {results['Users Configuration'][1]}")
+    
+    # Format messages
+    critical_message = None
+    warning_message = None
+    
+    if critical_failures:
+        critical_message = "❌ **Startup Health Check - Critical Issues:**\n\n"
+        critical_message += "\n".join(critical_failures)
+        critical_message += "\n\n**Troubleshooting Steps:**\n"
+        critical_message += "1. Verify `.env` file has all required variables:\n"
+        critical_message += "   - GOOGLE_DRIVE_ROOT_ID\n"
+        critical_message += "   - SERVICE_ACCOUNT_PATH\n"
+        critical_message += "   - ALLOWED_USERS (format: email:hash,email:hash)\n"
+        critical_message += "   - MONGODB_URI\n"
+        critical_message += "2. Check that service account file exists and is valid JSON\n"
+        critical_message += "3. Ensure Google Drive service account has proper permissions"
+    
+    if warnings:
+        warning_message = "⚠️ **Service Status:**\n\n"
+        warning_message += "\n".join(warnings)
+    
+    return critical_message, warning_message

@@ -36,7 +36,8 @@ def process_with_incremental_caching(
     ai_generated_folder_id: str,
     build_ai_mapping_func,
     match_original_with_ai_func,
-    download_file_content_func
+    download_file_content_func,
+    progress_callback=None
 ) -> Tuple[List[Dict], Dict]:
     """
     Process WER report with incremental caching logic.
@@ -59,6 +60,7 @@ def process_with_incremental_caching(
         build_ai_mapping_func: Function to build AI tool mapping
         match_original_with_ai_func: Function to match original with AI files
         download_file_content_func: Function to download SRT content
+        progress_callback: Optional callback(current, total) to update UI during WER calculation
         
     Returns:
         Tuple[List[Dict], Dict]: (combined_results, processing_info)
@@ -82,7 +84,8 @@ def process_with_incremental_caching(
         "cached_files": 0,
         "deleted_files": 0,
         "processing_time_seconds": 0,
-        "error_message": None
+        "error_message": None,
+        "db_errors": []
     }
     
     try:
@@ -116,7 +119,78 @@ def process_with_incremental_caching(
             else:
                 logger.info(f"Found {len(cached_file_ids)} previously processed files with {len(existing_results_check)} WER results")
         else:
-            logger.info("No previous processing found - will process all files")
+            logger.info("No previous processing found in MongoDB - checking local cache...")
+            # Try local cache as fallback if MongoDB metadata not available
+            local_cached_results = load_results_from_local_cache(year, month, language)
+            if local_cached_results:
+                logger.info(f"✅ Found {len(local_cached_results)} results in local JSON cache")
+                
+                # ===== Step 3: Get current file list from Google Drive =====
+                logger.info("Fetching current file list from Google Drive (checking for new files)...")
+                current_ai_files = list_srt_files_with_metadata(drive_service, ai_generated_folder_id)
+                current_file_ids = [f['id'] for f in current_ai_files]
+                logger.info(f"Found {len(current_file_ids)} files currently in AI_Generated_Files")
+                
+                # ===== Step 4: Get cached file IDs from cache results =====
+                cached_file_ids_from_cache = [r.get('google_drive_file_id') for r in local_cached_results if r.get('google_drive_file_id')]
+                logger.info(f"Local cache has {len(cached_file_ids_from_cache)} file IDs")
+                
+                # ===== Step 5: Check for new files =====
+                new_file_ids, deleted_file_ids = identify_new_files(current_file_ids, cached_file_ids_from_cache)
+                logger.info(f"Detected: {len(new_file_ids)} new files, {len(deleted_file_ids)} deleted files")
+                
+                # If no new/deleted files, return cache as-is
+                if len(new_file_ids) == 0 and len(deleted_file_ids) == 0:
+                    logger.info("No changes detected - returning cache as-is")
+                    processing_info["status"] = "success"
+                    processing_info["total_files"] = len(local_cached_results)
+                    processing_info["cached_files"] = len(local_cached_results)
+                    processing_info["newly_processed"] = 0
+                    end_time = datetime.utcnow()
+                    processing_info["processing_time_seconds"] = (end_time - start_time).total_seconds()
+                    logger.info(f"Returning {len(local_cached_results)} cached results from local JSON cache")
+                    return local_cached_results, processing_info
+                
+                # If new files exist, process them and merge with cache
+                if len(new_file_ids) > 0:
+                    logger.info(f"Processing {len(new_file_ids)} new files found since cache...")
+                    
+                    # Get original files
+                    original_files = list_srt_files_with_metadata(drive_service, original_folder_id)
+                    
+                    # Process only new files
+                    files_to_process = [f for f in current_ai_files if f['id'] in new_file_ids]
+                    
+                    new_wer_results = _calculate_wer_for_files(
+                        files_to_process,
+                        original_files,
+                        drive_service,
+                        build_ai_mapping_func,
+                        match_original_with_ai_func,
+                        download_file_content_func,
+                        progress_callback=progress_callback
+                    )
+                    
+                    # Merge new results with cached results
+                    combined_results = merge_results(local_cached_results, new_wer_results, deleted_file_ids)
+                    
+                    logger.info(f"Merged {len(local_cached_results)} cached + {len(new_wer_results)} new = {len(combined_results)} total")
+                    
+                    # Save merged results back to cache
+                    try:
+                        save_results_to_local_cache(year, month, language, combined_results)
+                        logger.info("✓ Merged results saved to local cache")
+                    except Exception as cache_save_error:
+                        logger.warning(f"Could not update local cache: {str(cache_save_error)}")
+                    
+                    processing_info["status"] = "success"
+                    processing_info["total_files"] = len(combined_results)
+                    processing_info["cached_files"] = len(local_cached_results)
+                    processing_info["newly_processed"] = len(new_wer_results)
+                    end_time = datetime.utcnow()
+                    processing_info["processing_time_seconds"] = (end_time - start_time).total_seconds()
+                    logger.info(f"Returning {len(combined_results)} merged results (cache + new)")
+                    return combined_results, processing_info
         
         # ===== Step 3: Get current file list from Google Drive =====
         logger.info("Fetching current file list from Google Drive...")
@@ -154,7 +228,8 @@ def process_with_incremental_caching(
                 drive_service,
                 build_ai_mapping_func,
                 match_original_with_ai_func,
-                download_file_content_func
+                download_file_content_func,
+                progress_callback=progress_callback  # Pass progress callback to track calculation
             )
             
             logger.info(f"WER calculation returned {len(new_wer_results)} results")
@@ -183,11 +258,13 @@ def process_with_incremental_caching(
             
             # ===== Step 8: Save to MongoDB =====
             logger.info(f"Saving {len(combined_results)} results to MongoDB...")
-            save_success = save_wer_results(year, month, language, combined_results)
-            logger.info(f"Save result: {save_success}")
+            save_result = save_wer_results(year, month, language, combined_results)
+            logger.info(f"Save result: {save_result}")
             
-            if not save_success:
-                logger.warning("Failed to save to MongoDB, but will continue with local cache backup")
+            if not save_result.get('success'):
+                error_msg = save_result.get('message', 'Unknown error')
+                processing_info["db_errors"].append(f"MongoDB save failed: {error_msg}")
+                logger.warning(f"Failed to save to MongoDB: {error_msg}, but will continue with local cache backup")
             
             # ===== ALWAYS save to local cache as backup (regardless of MongoDB success) =====
             logger.info(f"Saving {len(combined_results)} results to local JSON cache as backup...")
@@ -224,17 +301,21 @@ def process_with_incremental_caching(
                 f"Metadata update: tracking {len(final_tracked_ids)} total files "
                 f"(previously: {len(cached_file_ids)}, newly processed: {len(new_wer_results)}, deleted: {len(deleted_file_ids or [])})"
             )
-            update_success = update_processing_metadata(year, month, language, final_tracked_ids)
+            update_meta_result = update_processing_metadata(year, month, language, final_tracked_ids)
             
-            if not update_success:
-                logger.warning("Failed to update processing metadata")
+            if not update_meta_result.get('success'):
+                error_msg = update_meta_result.get('message', 'Unknown error')
+                processing_info["db_errors"].append(f"Metadata update failed: {error_msg}")
+                logger.warning(f"Failed to update processing metadata: {error_msg}")
             
             # ===== Step 9: Update tool metrics =====
-            try:
-                update_tool_summary_metrics(year, month, language, combined_results)
+            tool_metrics_result = update_tool_summary_metrics(year, month, language, combined_results)
+            if tool_metrics_result.get('success'):
                 logger.info("Tool metrics updated")
-            except Exception as e:
-                logger.warning(f"Could not update tool metrics: {str(e)}")
+            else:
+                error_msg = tool_metrics_result.get('message', 'Unknown error')
+                processing_info["db_errors"].append(f"Tool metrics update failed: {error_msg}")
+                logger.warning(f"Could not update tool metrics: {error_msg}")
             
         else:
             # No new files - just retrieve cached results
@@ -302,7 +383,8 @@ def process_with_incremental_caching(
                 drive_service,
                 build_ai_mapping_func,
                 match_original_with_ai_func,
-                download_file_content_func
+                download_file_content_func,
+                progress_callback=progress_callback  # Pass progress callback
             )
             
             if fresh_results:
@@ -341,7 +423,8 @@ def _calculate_wer_for_files(
     drive_service,
     build_ai_mapping_func,
     match_original_with_ai_func,
-    download_file_content_func
+    download_file_content_func,
+    progress_callback=None
 ) -> List[Dict]:
     """
     Calculate WER for a specific set of files.
@@ -353,6 +436,7 @@ def _calculate_wer_for_files(
         build_ai_mapping_func: Function to build AI tool mapping
         match_original_with_ai_func: Function to match files
         download_file_content_func: Function to download content
+        progress_callback: Optional callback(current, total) to track progress
         
     Returns:
         List[Dict]: WER calculation results
@@ -373,8 +457,17 @@ def _calculate_wer_for_files(
         if not matched_pairs:
             logger.info("No matched file pairs found - no files to process for these parameters")
             return wer_results
+        
         # Calculate WER for each pair
-        for pair in matched_pairs:
+        total_pairs = len(matched_pairs)
+        for pair_idx, pair in enumerate(matched_pairs):
+            # Update progress
+            if progress_callback:
+                try:
+                    progress_callback(pair_idx + 1, total_pairs)
+                except Exception as cb_error:
+                    logger.debug(f"Progress callback error: {str(cb_error)}")
+            
             base_name = pair.get('base_name')
             original_file = pair.get('original_file')
             ai_versions = pair.get('ai_versions', [])

@@ -114,11 +114,12 @@ def save_wer_results(year: int, month: str, language: str,
         else:
             logger.info(f"Updated WER result document for {year}/{month}/{language}")
         
-        return True
+        return {"success": True, "message": None}
         
     except Exception as e:
-        logger.error(f"Error saving WER results: {str(e)}")
-        return False
+        error_msg = str(e)
+        logger.error(f"Error saving WER results: {error_msg}")
+        return {"success": False, "message": error_msg}
 
 
 def merge_results(existing_results: List[Dict], new_results: List[Dict],
@@ -239,11 +240,12 @@ def update_processing_metadata(year: int, month: str, language: str,
         )
         
         logger.info(f"Updated metadata: {len(file_ids)} processed files for {year}/{month}/{language}")
-        return True
+        return {"success": True, "message": None}
         
     except Exception as e:
-        logger.error(f"Error updating processing metadata: {str(e)}")
-        return False
+        error_msg = str(e)
+        logger.error(f"Error updating processing metadata: {error_msg}")
+        return {"success": False, "message": error_msg}
 
 
 def identify_new_files(current_file_ids: List[str], processed_file_ids: List[str]) -> Tuple[List[str], List[str]]:
@@ -345,11 +347,12 @@ def update_tool_summary_metrics(year: int, month: str, language: str,
         )
         
         logger.info(f"Updated tool metrics for {year}/{month}/{language}")
-        return True
+        return {"success": True, "message": None}
         
     except Exception as e:
-        logger.error(f"Error updating tool metrics: {str(e)}")
-        return False
+        error_msg = str(e)
+        logger.error(f"Error updating tool metrics: {error_msg}")
+        return {"success": False, "message": error_msg}
 
 
 def get_tool_summary_metrics(year: int, month: str, language: str) -> Dict:

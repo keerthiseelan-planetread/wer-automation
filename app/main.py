@@ -251,12 +251,16 @@ if "health_check_done" not in st.session_state:
     health_results = run_startup_health_checks()
     st.session_state["health_check_done"] = True
     
-    # Check if any service is down
-    unhealthy_services = [name for name, (status, _) in health_results.items() if not status]
-    if unhealthy_services:
-        st.session_state["health_check_results"] = health_results
-    else:
-        st.session_state["health_check_ok"] = True
+    # Get critical failures and warnings separately
+    critical_errors, warnings = format_health_check_results(health_results)
+    
+    # Store for display
+    if critical_errors:
+        st.session_state["critical_health_errors"] = critical_errors
+    if warnings:
+        st.session_state["health_warnings"] = warnings
+    
+    st.session_state["health_check_results"] = health_results
 
 # Initialize session state
 if "authenticated" not in st.session_state:
@@ -268,13 +272,23 @@ if "generating_report" not in st.session_state:
 if "processing_error" not in st.session_state:
     st.session_state["processing_error"] = None
 
-# Display health check warnings if any
-if "health_check_results" in st.session_state:
-    health_results = st.session_state["health_check_results"]
-    warning_message = format_health_check_results(health_results)
-    if warning_message:
-        st.warning(warning_message)
-        st.stop()
+# Display health check messages
+if "critical_health_errors" in st.session_state:
+    st.error(st.session_state["critical_health_errors"])
+    st.stop()  # Block app - critical service missing
+
+if "health_warnings" in st.session_state:
+    if "dismiss_health_warning" not in st.session_state:
+        st.session_state["dismiss_health_warning"] = False
+    
+    if not st.session_state["dismiss_health_warning"]:
+        col1, col2 = st.columns([20, 1])
+        with col1:
+            st.warning(st.session_state["health_warnings"])
+        with col2:
+            if st.button("✕", key="close_health_warning", help="Dismiss warning"):
+                st.session_state["dismiss_health_warning"] = True
+                st.rerun()
 
 # If not logged in → show login
 if not st.session_state["authenticated"]:
@@ -393,6 +407,18 @@ if st.session_state.get("processing_error"):
 
 # Processing and results
 if generate_clicked:
+    # Check if Google Drive is available (critical for new report generation)
+    if "health_check_results" in st.session_state:
+        drive_health = st.session_state["health_check_results"].get("Google Drive", (True, ""))[0]
+        if not drive_health:
+            st.error(
+                "❌ **Cannot Generate New Report**\n\n"
+                "Google Drive connection is not available. "
+                "However, you can still view your previously generated reports.\n\n"
+                "To generate new reports, please ensure Google Drive access is restored."
+            )
+            st.stop()
+    
     st.session_state["processing_error"] = None  # Clear error on new attempt
     st.session_state["generating_report"] = True
     st.rerun()  # Fresh rerun to clear error display and start processing
@@ -643,11 +669,12 @@ if st.session_state.get("show_results", False) and "wer_results" in st.session_s
     except Exception as e:
         st.warning(f"Could not generate tool summary: {str(e)}")
     
-    # Display any database errors that occurred
-    if processing_info.get("db_errors") and len(processing_info.get("db_errors", [])) > 0:
-        st.warning("⚠️ **Database Warnings:**")
-        for error in processing_info.get("db_errors", []):
-            st.warning(f"• {error}")
+    # Note: Database errors are logged and handled via fallback layers
+    # Only display them if needed for debugging in future
+    # if processing_info.get("db_errors") and len(processing_info.get("db_errors", [])) > 0:
+    #     st.warning("⚠️ **Database Warnings:**")
+    #     for error in processing_info.get("db_errors", []):
+    #         st.warning(f"• {error}")
     
     # Display results table
     st.markdown("<h3 style='margin-top: 30px;'>Detailed Results</h3>", unsafe_allow_html=True)
