@@ -49,8 +49,12 @@ class Config:
         if Config.SERVICE_ACCOUNT_PATH:
             if not os.path.exists(Config.SERVICE_ACCOUNT_PATH):
                 raise ValueError(
-                    f"Service account file not found at: {Config.SERVICE_ACCOUNT_PATH}\n"
-                    f"Please ensure SERVICE_ACCOUNT_PATH in .env points to a valid file."
+                    f"❌ Unable to find Google service account file\n\n"
+                    f"Expected location: {Config.SERVICE_ACCOUNT_PATH}\n\n"
+                    f"What to do:\n"
+                    f"1. Make sure the file '{os.path.basename(Config.SERVICE_ACCOUNT_PATH)}' exists in the app folder\n"
+                    f"2. Check that SERVICE_ACCOUNT_PATH in .env file has the correct filename\n"
+                    f"3. If you don't have a service account file, download it from Google Cloud Console"
                 )
             
             # Validate service account file is valid JSON

@@ -48,7 +48,7 @@ def check_google_drive_credentials() -> Tuple[bool, str]:
         
         # First check if service account file exists
         if not os.path.exists(Config.SERVICE_ACCOUNT_PATH):
-            return False, f"Service account file not found at: {Config.SERVICE_ACCOUNT_PATH}"
+            return False, f"❌ Google service account file not found at: {Config.SERVICE_ACCOUNT_PATH}. Please verify the SERVICE_ACCOUNT_PATH in your .env file."
         
         # Check if it's valid JSON
         try:

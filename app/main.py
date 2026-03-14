@@ -13,6 +13,7 @@ from app.wer_engine.srt_parser import parse_srt
 from app.drive.drive_utils import find_folder, list_srt_files, traverse_structure
 from app.drive.drive_service import get_drive_service
 from app.drive.drive_utils import download_file_content
+from googleapiclient.errors import HttpError
 
 # Import incremental processing
 from app.Services.incremental_processor import process_with_incremental_caching, get_processing_summary
@@ -597,6 +598,31 @@ if st.session_state["generating_report"]:
                 import traceback
                 st.error(f"Details: {traceback.format_exc()}")
     
+    except HttpError as e:
+        progress_placeholder.empty()
+        status_placeholder.empty()
+        st.session_state["generating_report"] = False
+        st.session_state["show_results"] = False
+        
+        if e.resp.status == 404:
+            st.error(
+                "❌ Google Drive Configuration Error\n\n"
+                "The folder ID in your configuration is invalid or no longer accessible.\n\n"
+                f"Invalid Folder ID: {Config.GOOGLE_DRIVE_ROOT_ID}\n\n"
+                "What to do:\n"
+                "1. Verify the GOOGLE_DRIVE_ROOT_ID in your .env file is correct\n"
+                "2. Make sure you have access to the Google Drive folder\n"
+                "3. Check that the folder hasn't been deleted or moved"
+            )
+        else:
+            st.error(
+                f"❌ Google Drive Error ({e.resp.status})\n\n"
+                "An error occurred while accessing Google Drive.\n\n"
+                "Please check:\n"
+                "1. Your internet connection\n"
+                "2. Your Google Drive permissions\n"
+                "3. Try again in a few moments"
+            )
     except Exception as e:
         progress_placeholder.empty()
         status_placeholder.empty()
@@ -821,3 +847,4 @@ if st.session_state.get("show_results", False) and "wer_results" in st.session_s
             with col2:
                 if st.button("✕", key="close_metrics_download_msg", help="Close message"):
                     st.session_state["metrics_download_clicked"] = False
+
