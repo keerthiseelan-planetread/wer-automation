@@ -18,6 +18,9 @@ from app.drive.drive_utils import download_file_content
 from app.Services.incremental_processor import process_with_incremental_caching, get_processing_summary
 from app.Services.file_matcher import build_ai_mapping, match_original_with_ai
 
+# Import health checks
+from app.health_check import run_startup_health_checks, format_health_check_results
+
 
 # Configure page
 st.set_page_config(
@@ -236,9 +239,24 @@ st.markdown("""
 # Validate config
 try:
     Config.validate()
-except Exception as e:
-    st.error(f"Configuration Error: {e}")
+except ValueError as e:
+    st.error(f"❌ **Configuration Error**\n\n{str(e)}")
     st.stop()
+except Exception as e:
+    st.error(f"❌ **Unexpected Configuration Error**\n\n{str(e)}")
+    st.stop()
+
+# Run health checks if using session (only run once per session)
+if "health_check_done" not in st.session_state:
+    health_results = run_startup_health_checks()
+    st.session_state["health_check_done"] = True
+    
+    # Check if any service is down
+    unhealthy_services = [name for name, (status, _) in health_results.items() if not status]
+    if unhealthy_services:
+        st.session_state["health_check_results"] = health_results
+    else:
+        st.session_state["health_check_ok"] = True
 
 # Initialize session state
 if "authenticated" not in st.session_state:
@@ -249,6 +267,14 @@ if "generating_report" not in st.session_state:
 
 if "processing_error" not in st.session_state:
     st.session_state["processing_error"] = None
+
+# Display health check warnings if any
+if "health_check_results" in st.session_state:
+    health_results = st.session_state["health_check_results"]
+    warning_message = format_health_check_results(health_results)
+    if warning_message:
+        st.warning(warning_message)
+        st.stop()
 
 # If not logged in → show login
 if not st.session_state["authenticated"]:
@@ -398,8 +424,16 @@ if st.session_state["generating_report"]:
         with status_placeholder.container():
             st.info("📁 Locating Original and AI folders...")
         
-        original_folder = find_folder(service, language_id, "Original_Files")
-        ai_folder = find_folder(service, language_id, "AI_Generated_Files")
+        try:
+            original_folder = find_folder(service, language_id, "Original_Files")
+            ai_folder = find_folder(service, language_id, "AI_Generated_Files")
+        except Exception as e:
+            status_placeholder.empty()
+            progress_placeholder.empty()
+            st.session_state["generating_report"] = False
+            st.session_state["show_results"] = False
+            st.error(f"❌ Error accessing Google Drive folders: {str(e)[:100]}")
+            st.stop()
 
         if not original_folder or not ai_folder:
             status_placeholder.empty()
@@ -423,6 +457,16 @@ if st.session_state["generating_report"]:
                 st.info("🗄️ Checking database for cached results...")
             
             try:
+                # Define progress callback for WER calculation
+                def update_progress(current, total):
+                    """Update progress bar during WER calculation."""
+                    with status_placeholder.container():
+                        st.info(f"📊 Calculating WER: {current}/{total} files processed...")
+                    if total > 0:
+                        # Scale progress from 40-95 for WER calculation portion
+                        progress_percent = 40 + (current / total) * 55
+                        progress_bar.progress(min(int(progress_percent), 95))
+                
                 # Call incremental processor
                 results_raw, processing_info = process_with_incremental_caching(
                     year=int(selected_year),
@@ -433,7 +477,8 @@ if st.session_state["generating_report"]:
                     ai_generated_folder_id=ai_id,
                     build_ai_mapping_func=build_ai_mapping,
                     match_original_with_ai_func=match_original_with_ai,
-                    download_file_content_func=download_file_content
+                    download_file_content_func=download_file_content,
+                    progress_callback=update_progress  # Pass progress callback
                 )
                 
                 progress_bar.progress(100)
@@ -597,6 +642,12 @@ if st.session_state.get("show_results", False) and "wer_results" in st.session_s
         pass
     except Exception as e:
         st.warning(f"Could not generate tool summary: {str(e)}")
+    
+    # Display any database errors that occurred
+    if processing_info.get("db_errors") and len(processing_info.get("db_errors", [])) > 0:
+        st.warning("⚠️ **Database Warnings:**")
+        for error in processing_info.get("db_errors", []):
+            st.warning(f"• {error}")
     
     # Display results table
     st.markdown("<h3 style='margin-top: 30px;'>Detailed Results</h3>", unsafe_allow_html=True)

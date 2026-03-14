@@ -1,7 +1,10 @@
 import os
+import json
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 class Config:
     # Google Drive Configuration
@@ -22,8 +25,11 @@ class Config:
 
     @staticmethod
     def validate():
+        """Validate all configuration variables and their validity."""
         missing = []
+        issues = []
 
+        # Check required variables exist
         if not Config.GOOGLE_DRIVE_ROOT_ID:
             missing.append("GOOGLE_DRIVE_ROOT_ID")
 
@@ -38,6 +44,37 @@ class Config:
 
         if missing:
             raise ValueError(f"Missing environment variables: {', '.join(missing)}")
+        
+        # Validate service account file exists
+        if Config.SERVICE_ACCOUNT_PATH:
+            if not os.path.exists(Config.SERVICE_ACCOUNT_PATH):
+                raise ValueError(
+                    f"Service account file not found at: {Config.SERVICE_ACCOUNT_PATH}\n"
+                    f"Please ensure SERVICE_ACCOUNT_PATH in .env points to a valid file."
+                )
+            
+            # Validate service account file is valid JSON
+            try:
+                with open(Config.SERVICE_ACCOUNT_PATH, 'r') as f:
+                    json.load(f)
+                logger.info("✓ Service account file loaded successfully")
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"Service account file is not valid JSON at: {Config.SERVICE_ACCOUNT_PATH}\n"
+                    f"Error: {str(e)}"
+                )
+            except Exception as e:
+                raise ValueError(
+                    f"Cannot read service account file: {Config.SERVICE_ACCOUNT_PATH}\n"
+                    f"Error: {str(e)}"
+                )
+        
+        # Validate MONGODB_URI format (basic check)
+        if Config.MONGODB_URI and not Config.MONGODB_URI.startswith("mongodb"):
+            issues.append("MONGODB_URI does not appear to be a valid MongoDB connection string")
+        
+        if issues:
+            logger.warning(f"Configuration warnings: {'; '.join(issues)}")
 
     @staticmethod
     def get_allowed_users():
@@ -45,18 +82,35 @@ class Config:
             return {}
 
         users_dict = {}
-
         user_entries = Config.ALLOWED_USERS.split(",")
-
-        for entry in user_entries:
+        
+        skipped_count = 0
+        for idx, entry in enumerate(user_entries):
             parts = entry.split(":")
 
             if len(parts) != 2:
-                continue  # skip malformed entries
+                skipped_count += 1
+                logger.warning(
+                    f"ALLOWED_USERS entry {idx}: Invalid format (expected 'email:hash'). "
+                    f"Skipped: '{entry.strip()[:50]}...'" if len(entry) > 50 else f"Skipped: '{entry.strip()}'"
+                )
+                continue
 
             email = parts[0].strip()
             hashed_password = parts[1].strip()
+            
+            if not email or not hashed_password:
+                skipped_count += 1
+                logger.warning(f"ALLOWED_USERS entry {idx}: Empty email or password. Skipped.")
+                continue
 
             users_dict[email] = hashed_password
-
+        
+        if skipped_count > 0:
+            logger.warning(
+                f"Loaded {len(users_dict)} users, skipped {skipped_count} invalid entries from ALLOWED_USERS"
+            )
+        else:
+            logger.info(f"Loaded {len(users_dict)} authorized users from ALLOWED_USERS")
+        
         return users_dict
