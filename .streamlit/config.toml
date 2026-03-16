@@ -2,8 +2,6 @@
 showErrorDetails = false
 toolbarMode = "minimal"
 showSidebarNavigation = true
-maxMessageSize = 200
-showStrimLitDeploymentAnalytics = false
 
 [server]
 port = 8501
@@ -11,9 +9,7 @@ headless = true
 runOnSave = false
 maxUploadSize = 200
 enableXsrfProtection = true
-enableCORS = false
-maxRequestSize = 200
-websocketCompression = false
+enableCORS = true
 
 [logger]
 level = "warning"

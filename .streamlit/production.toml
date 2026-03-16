@@ -3,9 +3,6 @@
 showErrorDetails = false
 toolbarMode = "minimal"
 showSidebarNavigation = true
-maxMessageSize = 200
-# Prevent module loading issues during long-running tasks
-showStrimLitDeploymentAnalytics = false
 
 [server]
 port = 8501
@@ -13,11 +10,7 @@ headless = true
 runOnSave = false
 maxUploadSize = 200
 enableXsrfProtection = true
-enableCORS = false
-# Increase timeout for long-running report generation
-maxRequestSize = 200
-# Keep websocket connection alive during processing
-websocketCompression = false
+enableCORS = true
 
 [logger]
 level = "warning"
