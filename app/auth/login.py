@@ -25,11 +25,13 @@ def apply_login_styles():
         .stTextInput > div > div > input {
             border: 2px solid #e0e7ff !important;
             border-radius: 8px !important;
-            padding: 12px 16px !important;
-            font-size: 16px !important;
+            padding: 18px 20px !important;
+            font-size: 18px !important;
             transition: all 0.3s ease !important;
             background-color: #ffffff !important;
             color: #1f2937 !important;
+            height: 50px !important;
+            min-height: 50px !important;
         }
         
         .stTextInput > div > div > input::placeholder {
@@ -81,6 +83,13 @@ def apply_login_styles():
             color: #1f2937 !important;
             font-weight: 600 !important;
         }
+        
+        /* Hide form hint/help text */
+        .stForm > div > div > .stHelpText,
+        .stForm small,
+        [data-testid="stForm"] small {
+            display: none !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -112,33 +121,35 @@ def login_user():
         
         st.markdown("<h2 style='text-align: center; color: #1f2937; margin-top: 0;'>Welcome Back!</h2>", unsafe_allow_html=True)
         
-        email = st.text_input("📧 Email Address", placeholder="Enter your email")
-        password = st.text_input("🔐 Password", type="password", placeholder="Enter your password")
+        # Use form to properly capture autofilled credentials
+        with st.form("login_form"):
+            email = st.text_input("📧 Email Address", placeholder="Enter your email", autocomplete="email")
+            password = st.text_input("🔐 Password", type="password", placeholder="Enter your password", autocomplete="current-password")
+            
+            # Login button
+            submitted = st.form_submit_button("Sign In", use_container_width=True)
         
-        # Login button
-        if st.button("Sign In", use_container_width=True, key="login_btn"):
+        if submitted:
             if not email or not password:
                 st.error("Please fill in all fields")
-                return
-            
-            allowed_users = Config.get_allowed_users()
-
-            # Check if email exists
-            if email.strip() not in allowed_users:
-                st.error("❌ Unauthorized email. Please contact administrator.")
-                return
-
-            stored_hash = allowed_users[email.strip()].encode("utf-8")
-
-            # Validate password
-            if bcrypt.checkpw(password.encode("utf-8"), stored_hash):
-                st.session_state["authenticated"] = True
-                st.session_state["user_email"] = email
-                st.session_state["show_login_success"] = True
-                st.session_state["sidebar_expanded"] = True  # Keep sidebar expanded after login
-                st.rerun()
             else:
-                st.error("❌ Incorrect password. Please try again.")
+                allowed_users = Config.get_allowed_users()
+
+                # Check if email exists
+                if email.strip() not in allowed_users:
+                    st.error("❌ Unauthorized email. Please contact administrator.")
+                else:
+                    stored_hash = allowed_users[email.strip()].encode("utf-8")
+
+                    # Validate password
+                    if bcrypt.checkpw(password.encode("utf-8"), stored_hash):
+                        st.session_state["authenticated"] = True
+                        st.session_state["user_email"] = email
+                        st.session_state["show_login_success"] = True
+                        st.session_state["sidebar_expanded"] = True  # Keep sidebar expanded after login
+                        st.rerun()
+                    else:
+                        st.error("❌ Incorrect password. Please try again.")
         
         st.markdown("</div>", unsafe_allow_html=True)
         
