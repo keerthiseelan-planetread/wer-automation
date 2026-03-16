@@ -2,7 +2,7 @@
 [client]
 showErrorDetails = false
 toolbarMode = "minimal"
-showSidebarNavigation = false
+showSidebarNavigation = true
 maxMessageSize = 200
 # Prevent module loading issues during long-running tasks
 showStrimLitDeploymentAnalytics = false

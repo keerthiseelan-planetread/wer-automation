@@ -1,7 +1,7 @@
 [client]
 showErrorDetails = false
 toolbarMode = "minimal"
-showSidebarNavigation = false
+showSidebarNavigation = true
 maxMessageSize = 200
 showStrimLitDeploymentAnalytics = false
 
