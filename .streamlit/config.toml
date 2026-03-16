@@ -3,17 +3,28 @@ showErrorDetails = false
 toolbarMode = "minimal"
 showSidebarNavigation = false
 maxMessageSize = 200
+showStrimLitDeploymentAnalytics = false
 
 [server]
 port = 8501
 headless = true
-runOnSave = true
+runOnSave = false
 maxUploadSize = 200
 enableXsrfProtection = true
 enableCORS = false
+maxRequestSize = 200
+websocketCompression = false
 
 [logger]
-level = "info"
+level = "warning"
 
 [browser]
 gatherUsageStats = false
+serverAddress = "localhost"
+
+[theme]
+primaryColor = "#1e40af"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8fafc"
+textColor = "#1f2937"
+font = "sans serif"
