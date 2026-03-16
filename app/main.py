@@ -61,16 +61,6 @@ st.markdown("""
         display: none !important;
     }
     
-    /* Hide sidebar by default (shown only after login) */
-    [data-testid="stSidebar"] {
-        display: none !important;
-    }
-    
-    /* Show sidebar only when authenticated - this class will be added via session state */
-    .show-sidebar [data-testid="stSidebar"] {
-        display: block !important;
-    }
-    
     /* Global styles */
     .stApp {
         background: linear-gradient(to bottom, #f8fafc 0%, #ffffff 100%);
