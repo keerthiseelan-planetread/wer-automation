@@ -135,6 +135,7 @@ def login_user():
                 st.session_state["authenticated"] = True
                 st.session_state["user_email"] = email
                 st.session_state["show_login_success"] = True
+                st.session_state["sidebar_expanded"] = True  # Keep sidebar expanded after login
                 st.rerun()
             else:
                 st.error("❌ Incorrect password. Please try again.")

@@ -61,6 +61,16 @@ st.markdown("""
         display: none !important;
     }
     
+    /* Hide sidebar by default (shown only after login) */
+    [data-testid="stSidebar"] {
+        display: none !important;
+    }
+    
+    /* Show sidebar only when authenticated - this class will be added via session state */
+    .show-sidebar [data-testid="stSidebar"] {
+        display: block !important;
+    }
+    
     /* Global styles */
     .stApp {
         background: linear-gradient(to bottom, #f8fafc 0%, #ffffff 100%);
@@ -267,6 +277,9 @@ if "health_check_done" not in st.session_state:
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
+if "sidebar_expanded" not in st.session_state:
+    st.session_state["sidebar_expanded"] = True
+
 if "generating_report" not in st.session_state:
     st.session_state["generating_report"] = False
 
@@ -295,6 +308,19 @@ if "health_warnings" in st.session_state:
 if not st.session_state["authenticated"]:
     login_user()
     st.stop()
+
+# Show sidebar for authenticated users
+st.markdown("""
+<style>
+    .stApp {
+        --sidebar-visible: true;
+    }
+    /* Show sidebar only for authenticated users */
+    [data-testid="stSidebar"] {
+        display: block !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ===========================
 # SIDEBAR - User Info & Logout
@@ -585,7 +611,7 @@ if st.session_state["generating_report"]:
                     st.session_state["generating_report"] = False
                     st.rerun()
                 else:
-                    st.warning("⚠️ No results to display. The files may have been processed but no WER scores were calculated. Check the terminal logs for details.")
+                    st.warning("❌ No matching SRT file pairs found. Please ensure you have both original and AI-generated SRT files for the selected language, month, and year.")
                     st.session_state["generating_report"] = False
                     st.session_state["show_results"] = False
                     
