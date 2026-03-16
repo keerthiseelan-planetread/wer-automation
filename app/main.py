@@ -299,19 +299,6 @@ if not st.session_state["authenticated"]:
     login_user()
     st.stop()
 
-# Show sidebar for authenticated users
-st.markdown("""
-<style>
-    .stApp {
-        --sidebar-visible: true;
-    }
-    /* Show sidebar only for authenticated users */
-    [data-testid="stSidebar"] {
-        display: block !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 # ===========================
 # SIDEBAR - User Info & Logout
 # ===========================
