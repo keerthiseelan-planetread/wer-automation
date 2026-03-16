@@ -17,7 +17,6 @@ level = "warning"
 
 [browser]
 gatherUsageStats = false
-serverAddress = "wer-automation.onrender.com"
 
 [theme]
 primaryColor = "#1e40af"
