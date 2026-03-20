@@ -12,45 +12,45 @@ _mongo_client = None
 
 
 def get_mongo_client(timeout=5000):
-    """
-    Get or create MongoDB client with connection pooling.
-    
-    Args:
-        timeout: Connection timeout in milliseconds
-        
-    Returns:
-        MongoClient: MongoDB client instance
-        
-    Raises:
-        ConnectionError: If unable to connect to MongoDB
-    """
     global _mongo_client
-    
+
     if _mongo_client is not None:
         return _mongo_client
-    
+
     try:
         logger.info("Connecting to MongoDB...")
-        _mongo_client = MongoClient(
-            Config.MONGODB_URI,
-            serverSelectionTimeoutMS=timeout,
-            connectTimeoutMS=timeout,
-            socketTimeoutMS=timeout,
-            retryWrites=True,
-            w="majority",
-            ssl=True,
-            tlsAllowInvalidCertificates=True
-        )
-        
-        # Verify connection with shorter timeout
+
+        # 👉 Detect if using Atlas (cloud) or local
+        if "mongodb+srv" in Config.MONGODB_URI:
+            # ✅ MongoDB Atlas (SSL required)
+            _mongo_client = MongoClient(
+                Config.MONGODB_URI,
+                serverSelectionTimeoutMS=timeout,
+                connectTimeoutMS=timeout,
+                socketTimeoutMS=timeout,
+                retryWrites=True,
+                tls=True
+            )
+        else:
+            # ✅ Local MongoDB (NO SSL)
+            _mongo_client = MongoClient(
+                Config.MONGODB_URI,
+                serverSelectionTimeoutMS=timeout,
+                connectTimeoutMS=timeout,
+                socketTimeoutMS=timeout
+            )
+
+        # Verify connection
         logger.info("Verifying MongoDB connection...")
         _mongo_client.admin.command('ping')
-        logger.info("Successfully connected to MongoDB")
+
+        logger.info("✅ Successfully connected to MongoDB")
         return _mongo_client
-        
+
     except (ServerSelectionTimeoutError, ConnectionFailure) as e:
         logger.error(f"Failed to connect to MongoDB: {str(e)}")
         raise ConnectionError(f"MongoDB connection failed: {str(e)}")
+
     except Exception as e:
         logger.error(f"Unexpected error connecting to MongoDB: {str(e)}")
         raise ConnectionError(f"Unexpected MongoDB error: {str(e)}")

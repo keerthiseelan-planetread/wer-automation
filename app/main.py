@@ -1,8 +1,11 @@
 import sys
 import os
-
+import requests
 # Ensure workspace root is in Python path for module imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# ✅ MongoDB Imports
+from app.database.init_db import initialize_database
+from app.database.mongo_connection import get_database
 
 import streamlit as st
 from app.wer_engine.wer_calculater import calculate_wer
@@ -21,8 +24,101 @@ from app.Services.file_matcher import build_ai_mapping, match_original_with_ai
 
 # Import health checks
 from app.health_check import run_startup_health_checks, format_health_check_results
+# ===========================
+# DATABASE SAVE FUNCTION
+# ===========================
+def save_all_results_to_db():
+    try:
+        year = int(st.session_state["result_year"])
+        month = st.session_state["result_month"]
+        language = st.session_state["result_language"]
+        wer_results = st.session_state["wer_results"]
+        processing_info = st.session_state.get("processing_info", {})
 
+        # =========================
+        # 1️⃣ WER RESULTS
+        # =========================
+        wer_payload = {
+            "year": year,
+            "month": month,
+            "language": language,
+            "results": [
+                {
+                    "base_name": r["File Name"],
+                    "ai_tool": r["AI Tool"],
+                    "wer_score": r["WER Score (%)"],
+                    "google_drive_file_id": r.get("File ID", "")
+                }
+                for r in wer_results
+            ]
+        }
 
+        r1 = requests.post(
+            "http://localhost:8000/api/wer/save-wer-results",
+            json=wer_payload,
+            timeout=10
+        )
+        r1.raise_for_status()
+
+        # =========================
+        # 2️⃣ PERFORMANCE METADATA
+        # =========================
+        processed_file_ids = [r.get("File ID", r["File Name"]) for r in wer_results]
+
+        performance_payload = {
+            "year": year,
+            "month": month,
+            "language": language,
+            "processed_file_ids": processed_file_ids
+        }
+
+        r2 = requests.post(
+            "http://localhost:8000/api/wer/save-performance-metadata",
+            json=performance_payload,
+            timeout=10
+        )
+        r2.raise_for_status()
+
+        # =========================
+        # 3️⃣ TOOL SUMMARY METRICS
+        # =========================
+        tool_stats = {}
+        for r in wer_results:
+            tool = r["AI Tool"]
+            tool_stats.setdefault(tool, []).append(r["WER Score (%)"])
+
+        tool_metrics = {
+            tool: {
+                "average_wer": round(sum(scores) / len(scores), 2),
+                "best_wer": round(min(scores), 2),
+                "worst_wer": round(max(scores), 2),
+                "total_files": len(scores)
+            }
+            for tool, scores in tool_stats.items()
+        }
+
+        tool_metrics_payload = {
+            "year": year,
+            "month": month,
+            "language": language,
+            "tool_metrics": tool_metrics
+        }
+
+        r3 = requests.post(
+            "http://localhost:8000/api/wer/save-tool-summary-metrics",
+            json=tool_metrics_payload,
+            timeout=10
+        )
+        r3.raise_for_status()
+        st.success("✅ All results saved successfully!")
+        print(r3.json())
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"⚠️ API Request Error: {str(e)}")
+    except Exception as e:
+        st.error(f"⚠️ Unexpected Error: {str(e)}")
+
+BACKEND_API_URL = "http://localhost:8000/api/wer/save"
 # Configure page
 st.set_page_config(
     page_title="WER Automation Dashboard",
@@ -432,6 +528,7 @@ if st.session_state.get("processing_error"):
 
 # Processing and results
 if generate_clicked:
+    st.session_state["db_saved"] = False   # ⭐ ADD THIS
     # Check if Google Drive is available (critical for new report generation)
     if "health_check_results" in st.session_state:
         drive_health = st.session_state["health_check_results"].get("Google Drive", (True, ""))[0]
@@ -604,9 +701,12 @@ if st.session_state["generating_report"]:
                     st.session_state["result_language"] = selected_language
                     st.session_state["result_month"] = selected_month
                     st.session_state["result_year"] = selected_year
-                    st.session_state["processing_info"] = processing_info  # Store info for display
-                    st.session_state["show_results"] = True  # Enable results display
+                    st.session_state["processing_info"] = processing_info
+                    st.session_state["show_results"] = True
                     st.session_state["generating_report"] = False
+                    if not st.session_state.get("db_saved", False):
+                        save_all_results_to_db()
+                    st.session_state["db_saved"] = True
                     st.rerun()
                 else:
                     st.warning("❌ No matching SRT file pairs found. Please ensure you have both original and AI-generated SRT files for the selected language, month, and year.")
