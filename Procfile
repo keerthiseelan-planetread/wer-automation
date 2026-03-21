@@ -1,1 +1,2 @@
 web: streamlit run app/main.py --server.port=$PORT --server.address=0.0.0.0 --logger.level=warning --config .streamlit/production.toml
+scheduler: python -c "from app.Services.scheduler import start_scheduler; start_scheduler()"

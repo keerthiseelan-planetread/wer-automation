@@ -122,6 +122,43 @@ def save_wer_results(year: int, month: str, language: str,
         return {"success": False, "message": error_msg}
 
 
+def delete_empty_results(year: int, month: str, language: str) -> bool:
+    """
+    Delete WER result document if it contains 0 files processed.
+    Used to clean up empty folder results that shouldn't be stored.
+    
+    Args:
+        year: Year value
+        month: Month name
+        language: Language name
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        db = get_database()
+        wer_results_col = db[Config.MONGODB_COLLECTIONS["wer_results"]]
+        
+        param_hash = get_parameter_hash(year, month, language)
+        
+        # Delete the document if total_files_processed is 0
+        result = wer_results_col.delete_one({
+            "parameter_hash": param_hash,
+            "total_files_processed": 0
+        })
+        
+        if result.deleted_count > 0:
+            logger.info(f"Deleted empty result document for {year}/{month}/{language}")
+            return True
+        
+        return True  # No document to delete is also success
+        
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error deleting empty result: {error_msg}")
+        return False
+
+
 def merge_results(existing_results: List[Dict], new_results: List[Dict],
                  deleted_file_ids: List[str] = None) -> List[Dict]:
     """
