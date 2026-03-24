@@ -3,7 +3,7 @@ name: Daily WER Automation Scheduler
 on:
   # Run every day at 2:00 AM UTC
   schedule:
-    - cron: '0 21 * * *'
+    - cron: '15 22 * * *'
   
   # Allow manual trigger for testing
   workflow_dispatch:
@@ -21,6 +21,10 @@ jobs:
     concurrency:
       group: scheduler
       cancel-in-progress: false
+    
+    # Force Node.js 24 for actions (opt-in for future compatibility)
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     
     steps:
       # 1. Checkout the code
