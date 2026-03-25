@@ -12,8 +12,8 @@ class Config:
     SERVICE_ACCOUNT_PATH = os.getenv("SERVICE_ACCOUNT_PATH")
     ALLOWED_USERS = os.getenv("ALLOWED_USERS")
 
-    # MongoDB Configuration
-    MONGODB_URI = os.getenv("MONGODB_URI")
+    # ✅ MongoDB Configuration (DEFAULT → LOCAL COMPASS)
+    MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://127.0.0.1:27017")
     MONGODB_DB_NAME = "wer-automation"
     
     # MongoDB Collections
@@ -50,6 +50,9 @@ class Config:
         if missing:
             raise ValueError(f"Missing environment variables: {', '.join(missing)}")
         
+        # ✅ Show which DB is being used
+        logger.info(f"Using MongoDB URI: {Config.MONGODB_URI}")
+
         # Validate service account file exists
         if Config.SERVICE_ACCOUNT_PATH:
             if not os.path.exists(Config.SERVICE_ACCOUNT_PATH):
@@ -57,31 +60,32 @@ class Config:
                     f"❌ Unable to find Google service account file\n\n"
                     f"Expected location: {Config.SERVICE_ACCOUNT_PATH}\n\n"
                     f"What to do:\n"
-                    f"1. Make sure the file '{os.path.basename(Config.SERVICE_ACCOUNT_PATH)}' exists in the app folder\n"
-                    f"2. Check that SERVICE_ACCOUNT_PATH in .env file has the correct filename\n"
-                    f"3. If you don't have a service account file, download it from Google Cloud Console"
+                    f"1. Make sure the file '{os.path.basename(Config.SERVICE_ACCOUNT_PATH)}' exists\n"
+                    f"2. Check SERVICE_ACCOUNT_PATH in .env\n"
                 )
             
-            # Validate service account file is valid JSON
+            # Validate JSON
             try:
                 with open(Config.SERVICE_ACCOUNT_PATH, 'r') as f:
                     json.load(f)
                 logger.info("✓ Service account file loaded successfully")
             except json.JSONDecodeError as e:
                 raise ValueError(
-                    f"Service account file is not valid JSON at: {Config.SERVICE_ACCOUNT_PATH}\n"
-                    f"Error: {str(e)}"
+                    f"Service account file is not valid JSON: {str(e)}"
                 )
             except Exception as e:
                 raise ValueError(
-                    f"Cannot read service account file: {Config.SERVICE_ACCOUNT_PATH}\n"
-                    f"Error: {str(e)}"
+                    f"Cannot read service account file: {str(e)}"
                 )
         
-        # Validate MONGODB_URI format (basic check)
+        # Validate MongoDB URI
         if Config.MONGODB_URI and not Config.MONGODB_URI.startswith("mongodb"):
-            issues.append("MONGODB_URI does not appear to be a valid MongoDB connection string")
-        
+            issues.append("MONGODB_URI is not valid")
+
+        # ⚠️ Detect Atlas (just warning)
+        if "mongodb+srv" in Config.MONGODB_URI:
+            logger.warning("⚠️ You are using MongoDB Atlas. For Compass use mongodb://127.0.0.1:27017")
+
         if issues:
             logger.warning(f"Configuration warnings: {'; '.join(issues)}")
 
@@ -99,10 +103,7 @@ class Config:
 
             if len(parts) != 2:
                 skipped_count += 1
-                logger.warning(
-                    f"ALLOWED_USERS entry {idx}: Invalid format (expected 'email:hash'). "
-                    f"Skipped: '{entry.strip()[:50]}...'" if len(entry) > 50 else f"Skipped: '{entry.strip()}'"
-                )
+                logger.warning(f"Invalid ALLOWED_USERS entry skipped: {entry}")
                 continue
 
             email = parts[0].strip()
@@ -110,16 +111,10 @@ class Config:
             
             if not email or not hashed_password:
                 skipped_count += 1
-                logger.warning(f"ALLOWED_USERS entry {idx}: Empty email or password. Skipped.")
+                logger.warning(f"Empty email/password skipped: {entry}")
                 continue
 
             users_dict[email] = hashed_password
         
-        if skipped_count > 0:
-            logger.warning(
-                f"Loaded {len(users_dict)} users, skipped {skipped_count} invalid entries from ALLOWED_USERS"
-            )
-        else:
-            logger.info(f"Loaded {len(users_dict)} authorized users from ALLOWED_USERS")
-        
+        logger.info(f"Loaded {len(users_dict)} users")
         return users_dict
