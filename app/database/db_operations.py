@@ -405,22 +405,79 @@ def get_parameter_hash(year: int, month: str, language: str) -> str:
 def fetch_processed_file_ids(year: int, month: str, language: str) -> List[str]:
     db = get_database()
     col = db[Config.MONGODB_COLLECTIONS["processing_metadata"]]
-    doc = col.find_one({"parameter_hash": get_parameter_hash(year, month, language)})
+
+    doc = col.find_one({
+        "parameter_hash": get_parameter_hash(year, month, language)
+    })
+
     return doc.get("processed_file_ids", []) if doc else []
 
 
 # ----------------------------
 # GET RESULTS
 # ----------------------------
-def get_all_results_for_parameters(year: int, month: str, language: str) -> List[Dict]:
+def get_wer_results(year: int, month: str, language: str) -> List[Dict]:
     db = get_database()
     col = db[Config.MONGODB_COLLECTIONS["wer_results"]]
-    doc = col.find_one({"parameter_hash": get_parameter_hash(year, month, language)})
+
+    doc = col.find_one({
+        "parameter_hash": get_parameter_hash(year, month, language)
+    })
+
     return doc.get("results", []) if doc else []
 
 
 # ----------------------------
-# SAVE RESULTS (FIXED TIME)
+# IDENTIFY FILES
+# ----------------------------
+def identify_new_files(current: List[str], processed: List[str]) -> Tuple[List[str], List[str]]:
+    return list(set(current) - set(processed)), list(set(processed) - set(current))
+
+
+# ----------------------------
+# MERGE RESULTS (🔥 FIXED)
+# ----------------------------
+def merge_results(existing: List[Dict], new: List[Dict], deleted_ids: List[str] = None) -> List[Dict]:
+    deleted_ids = deleted_ids or []
+
+    # ✅ Use file_id as unique key
+    existing_dict = {
+        r.get("google_drive_file_id"): r
+        for r in existing if r.get("google_drive_file_id")
+    }
+
+    new_dict = {
+        r.get("google_drive_file_id"): r
+        for r in new if r.get("google_drive_file_id")
+    }
+
+    merged = []
+
+    # ✅ Handle existing
+    for file_id, old in existing_dict.items():
+
+        # 🔴 If deleted → archive
+        if file_id in deleted_ids:
+            old["file_status"] = "archived"
+            merged.append(old)
+
+        # 🟢 If updated → replace
+        elif file_id in new_dict:
+            merged.append(new_dict[file_id])
+            del new_dict[file_id]
+
+        # ⚪ If unchanged → keep
+        else:
+            merged.append(old)
+
+    # ✅ Add remaining new
+    merged.extend(new_dict.values())
+
+    return merged
+
+
+# ----------------------------
+# SAVE RESULTS (🔥 DUP FIX)
 # ----------------------------
 def save_wer_results(year: int, month: str, language: str, wer_results_list: List[Dict]):
     try:
@@ -429,12 +486,30 @@ def save_wer_results(year: int, month: str, language: str, wer_results_list: Lis
 
         param_hash = get_parameter_hash(year, month, language)
         now = datetime.utcnow()
+
         existing = col.find_one({"parameter_hash": param_hash})
 
+        # ✅ Normalize data
         for r in wer_results_list:
             r.setdefault("processed_timestamp", now)
             r.setdefault("file_status", "current")
             r["ai_tool"] = r.get("ai_tool", "").lower().title()
+
+        # 🔥 FIX: handle empty file_id
+        unique = {}
+        for r in wer_results_list:
+            file_id = r.get("google_drive_file_id")
+
+            # ✅ fallback unique key if empty
+            key = file_id if file_id else str(id(r))
+
+            unique[key] = r
+
+        wer_results_list = list(unique.values())
+
+        # 🚨 Prevent saving empty data
+        if not wer_results_list:
+            return {"success": False, "message": "No valid results to save"}
 
         doc = {
             "parameter_hash": param_hash,
@@ -448,12 +523,16 @@ def save_wer_results(year: int, month: str, language: str, wer_results_list: Lis
         }
 
         col.replace_one({"parameter_hash": param_hash}, doc, upsert=True)
+
+        print("✅ FINAL SAVED LIST:", wer_results_list)
+
         return {"success": True}
 
     except Exception as e:
+        logger.error(f"Error saving results: {str(e)}")
         return {"success": False, "message": str(e)}
-
-
+    
+    
 # ----------------------------
 # UPDATE METADATA
 # ----------------------------
@@ -461,6 +540,7 @@ def update_processing_metadata(year: int, month: str, language: str, file_ids: L
     try:
         db = get_database()
         col = db[Config.MONGODB_COLLECTIONS["processing_metadata"]]
+
         now = datetime.utcnow()
         param_hash = get_parameter_hash(year, month, language)
         existing = col.find_one({"parameter_hash": param_hash})
@@ -470,140 +550,119 @@ def update_processing_metadata(year: int, month: str, language: str, file_ids: L
             "year": year,
             "month": month,
             "language": language,
-            "processed_file_ids": file_ids,
+            "processed_file_ids": list(set(file_ids)),  # remove duplicates
             "last_sync_timestamp": now,
             "last_drive_folder_scan": now,
             "created_at": existing.get("created_at", now) if existing else now
         }
 
         col.replace_one({"parameter_hash": param_hash}, doc, upsert=True)
+
         return {"success": True}
 
     except Exception as e:
+        logger.error(f"Error updating metadata: {str(e)}")
         return {"success": False, "message": str(e)}
 
 
 # ----------------------------
-# IDENTIFY FILES
+# DELETE EMPTY RESULTS
 # ----------------------------
-def identify_new_files(current: List[str], processed: List[str]) -> Tuple[List[str], List[str]]:
-    return list(set(current) - set(processed)), list(set(processed) - set(current))
-
-
-# ----------------------------
-# MERGE RESULTS
-# ----------------------------
-def merge_results(existing: List[Dict], new: List[Dict], deleted_ids: List[str] = None) -> List[Dict]:
-    deleted_ids = deleted_ids or []
-    final = []
-
-    lookup = {(r["base_name"], r["ai_tool"]): r for r in new}
-
-    for r in existing:
-        if r.get("google_drive_file_id") in deleted_ids:
-            r["file_status"] = "archived"
-        key = (r["base_name"], r["ai_tool"])
-        final.append(lookup.pop(key, r))
-
-    final.extend(lookup.values())
-    return final
-
-
-# ----------------------------
-# TOOL METRICS
-# ----------------------------
-def update_tool_summary_metrics(year: int, month: str, language: str, tool_metrics: dict):
-    """
-    Save or update tool summary metrics with proper upsert.
-    If document exists, it updates 'tool_metrics' and 'updated_at'.
-    """
-    try:
-        db = get_database()
-        col = db[Config.MONGODB_COLLECTIONS["tool_summary_metrics"]]
-        now = datetime.utcnow()
-        param_hash = hashlib.sha256(f"{year}_{month}_{language}".encode()).hexdigest()
-
-        doc = {
-            "parameter_hash": param_hash,
-            "year": year,
-            "month": month,
-            "language": language,
-            "tool_metrics": tool_metrics,
-            "updated_at": now
-        }
-
-        col.replace_one({"parameter_hash": param_hash}, doc, upsert=True)
-        return {"success": True}
-
-    except Exception as e:
-        return {"success": False, "message": str(e)}
-    
-
-    # ----------------------------
-# GET WER RESULTS
-# ----------------------------
-def get_wer_results(year: int, month: str, language: str) -> List[Dict]:
+def delete_empty_results(year: int, month: str, language: str) -> bool:
     try:
         db = get_database()
         col = db[Config.MONGODB_COLLECTIONS["wer_results"]]
 
-        doc = col.find_one({
-            "parameter_hash": get_parameter_hash(year, month, language)
+        result = col.delete_one({
+            "parameter_hash": get_parameter_hash(year, month, language),
+            "total_files_processed": 0
         })
 
-        if doc:
-            return doc.get("results", [])
-
-        return []
+        return True
 
     except Exception as e:
-        logger.error(f"Error fetching WER results: {str(e)}")
-        return []
+        logger.error(f"Error deleting empty results: {str(e)}")
+        return False
 
 
 # ----------------------------
-# GET PROCESSING METADATA
+# TOOL METRICS (AUTO CALC)
 # ----------------------------
-def get_processing_metadata(year: int, month: str, language: str) -> Dict:
-    try:
-        db = get_database()
-        col = db[Config.MONGODB_COLLECTIONS["processing_metadata"]]
-
-        doc = col.find_one({
-            "parameter_hash": get_parameter_hash(year, month, language)
-        })
-
-        if doc:
-            return {
-                "processed_file_ids": doc.get("processed_file_ids", []),
-                "last_sync_timestamp": doc.get("last_sync_timestamp"),
-                "last_drive_folder_scan": doc.get("last_drive_folder_scan")
-            }
-
-        return {}
-
-    except Exception as e:
-        logger.error(f"Error fetching metadata: {str(e)}")
-        return {}
-
-
-# ----------------------------
-# GET TOOL SUMMARY METRICS
-# ----------------------------
-def get_tool_summary_metrics(year: int, month: str, language: str) -> Dict:
+def update_tool_summary_metrics(year: int, month: str, language: str, results: List[Dict]):
     try:
         db = get_database()
         col = db[Config.MONGODB_COLLECTIONS["tool_summary_metrics"]]
 
-        doc = col.find_one({
-            "parameter_hash": get_parameter_hash(year, month, language)
-        })
+        tool_data = {}
 
-        if doc:
-            return doc.get("tool_metrics", {})
+        for r in results:
+            if r.get("file_status") == "archived":
+                continue
 
-        return {}
+            tool = r.get("ai_tool", "Unknown")
+            wer = float(r.get("wer_score", 0))
+
+            if tool not in tool_data:
+                tool_data[tool] = []
+
+            tool_data[tool].append(wer)
+
+        summary = {}
+
+        for tool, scores in tool_data.items():
+            summary[tool] = {
+                "average_wer": sum(scores) / len(scores),
+                "best_wer": min(scores),
+                "worst_wer": max(scores),
+                "files_count": len(scores)
+            }
+
+        col.replace_one(
+            {"parameter_hash": get_parameter_hash(year, month, language)},
+            {
+                "parameter_hash": get_parameter_hash(year, month, language),
+                "year": year,
+                "month": month,
+                "language": language,
+                "tool_metrics": summary,
+                "updated_at": datetime.utcnow()
+            },
+            upsert=True
+        )
+
+        return {"success": True}
 
     except Exception as e:
-        logger.error(f"Error fetching tool metrics: {str(e)}")
-        return {}
+        logger.error(f"Error updating metrics: {str(e)}")
+        return {"success": False, "message": str(e)}  
+# ----------------------------
+# GET METADATA
+# ----------------------------
+def get_processing_metadata(year: int, month: str, language: str) -> Dict:
+    db = get_database()
+    col = db[Config.MONGODB_COLLECTIONS["processing_metadata"]]
+
+    doc = col.find_one({
+        "parameter_hash": get_parameter_hash(year, month, language)
+    })
+
+    if doc:
+        return {
+            "processed_file_ids": doc.get("processed_file_ids", []),
+            "last_sync_timestamp": doc.get("last_sync_timestamp"),
+            "last_drive_folder_scan": doc.get("last_drive_folder_scan")
+        }
+
+    return {}
+# ----------------------------
+# GET TOOL METRICS
+# ----------------------------
+def get_tool_summary_metrics(year: int, month: str, language: str) -> Dict:
+    db = get_database()
+    col = db[Config.MONGODB_COLLECTIONS["tool_summary_metrics"]]
+
+    doc = col.find_one({
+        "parameter_hash": get_parameter_hash(year, month, language)
+    })
+
+    return doc.get("tool_metrics", {}) if doc else {}

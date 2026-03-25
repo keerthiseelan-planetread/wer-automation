@@ -6,7 +6,7 @@ from datetime import datetime
 from app.database.db_operations import (
     get_parameter_hash,
     fetch_processed_file_ids,
-    get_all_results_for_parameters,
+    get_wer_results,
     save_wer_results,
     update_processing_metadata,
     identify_new_files,
@@ -109,7 +109,7 @@ def process_with_incremental_caching(
         
         if cached_file_ids:
             # Verify that actual WER results also exist - not just metadata
-            existing_results_check = get_all_results_for_parameters(year, month, language)
+            existing_results_check = get_wer_results(year, month, language)
             if not existing_results_check:
                 logger.warning(
                     f"Metadata has {len(cached_file_ids)} file IDs but WER results are empty. "
@@ -239,7 +239,7 @@ def process_with_incremental_caching(
             processing_info["newly_processed"] = len(new_wer_results)
             
             # ===== Step 6: Get existing cached results =====
-            existing_results = get_all_results_for_parameters(year, month, language)
+            existing_results = get_wer_results(year, month, language)
             processing_info["cached_files"] = len(existing_results)
             
             # ===== Step 7: Merge results =====
@@ -320,7 +320,7 @@ def process_with_incremental_caching(
         else:
             # No new files - just retrieve cached results
             logger.info("No new files detected - retrieving cached results only")
-            combined_results = get_all_results_for_parameters(year, month, language)
+            combined_results = get_wer_results(year, month, language)
             processing_info["cached_files"] = len(combined_results)
             processing_info["newly_processed"] = 0
         
@@ -347,7 +347,7 @@ def process_with_incremental_caching(
         # ===== FALLBACK LAYER 1: Try to return cached results from MongoDB =====
         logger.info("Fallback Layer 1: Attempting to retrieve MongoDB cached results...")
         try:
-            cached_results = get_all_results_for_parameters(year, month, language)
+            cached_results = get_wer_results(year, month, language)
             if cached_results:
                 logger.info(f"✅ Fallback Layer 1 SUCCESS: Returning {len(cached_results)} MongoDB cached results")
                 processing_info["status"] = "partial_success_mongodb_cache"

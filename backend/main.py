@@ -108,10 +108,11 @@
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
-# Assume these DB functions exist
+from app.database.mongo_connection import get_database
 from app.database.init_db import initialize_database
+from app.config import Config
 from app.database.db_operations import (
     save_wer_results,
     update_processing_metadata,
@@ -121,17 +122,26 @@ from app.database.db_operations import (
     get_tool_summary_metrics
 )
 
-# -------------------------------
-# CREATE APP
-# -------------------------------
+
+
 app = FastAPI(title="WER Automation API")
 
 # -------------------------------
-# STARTUP EVENT
+# STARTUP
 # -------------------------------
 @app.on_event("startup")
 def startup_event():
     initialize_database()
+
+# -------------------------------
+# CORS
+# -------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # -------------------------------
 # SCHEMAS
@@ -154,37 +164,36 @@ class PerformanceMetadataRequest(BaseModel):
     language: str
     processed_file_ids: List[str]
 
-class ToolMetric(BaseModel):
-    average_wer: float
-    best_wer: float
-    worst_wer: float
-    total_files: int
-
+from pydantic import BaseModel
 class ToolMetricsRequest(BaseModel):
     year: int
     month: str
     language: str
-    tool_metrics: Dict[str, ToolMetric]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
 
 # -------------------------------
 # HOME
 # -------------------------------
 @app.get("/")
 def home():
-    return {"message": "WER Backend API Running 🚀"}
+    return {"message": "WER Backend Running 🚀"}
 
-# -------------------------------
+# =========================================================
+# ------------------ POST APIs -----------------------------
+# =========================================================
+
 # 1️⃣ SAVE WER RESULTS
-# -------------------------------
+
+
 @app.post("/api/wer/save-wer-results")
 def save_wer_results_api(request: SaveWERResultsRequest):
+
+    print("🔥 RECEIVED:", request)
+
+    if not request.results:
+        raise HTTPException(status_code=400, detail="Results list is empty ❌")
+
     response = save_wer_results(
         year=request.year,
         month=request.month,
@@ -203,13 +212,13 @@ def save_wer_results_api(request: SaveWERResultsRequest):
     if not response["success"]:
         raise HTTPException(status_code=500, detail=response["message"])
 
-    return {"status": "success", "message": "WER results saved successfully"}
+    return {"status": "success", "message": "WER results saved"}
 
-# -------------------------------
-# 2️⃣ SAVE PROCESSING METADATA
-# -------------------------------
+
+# 2️⃣ SAVE METADATA
 @app.post("/api/wer/save-performance-metadata")
-def save_performance_metadata(request: PerformanceMetadataRequest):
+def save_metadata(request: PerformanceMetadataRequest):
+
     response = update_processing_metadata(
         year=request.year,
         month=request.month,
@@ -220,138 +229,132 @@ def save_performance_metadata(request: PerformanceMetadataRequest):
     if not response["success"]:
         raise HTTPException(status_code=500, detail=response["message"])
 
-    return {"status": "success", "message": "Performance metadata saved"}
+    return {"status": "success", "message": "Metadata saved"}
 
-# -------------------------------
-# 3️⃣ SAVE TOOL SUMMARY METRICS
-# -------------------------------
+
+# 3️⃣ SAVE TOOL METRICS (AUTO)
 @app.post("/api/wer/save-tool-summary-metrics")
-def save_tool_summary_metrics_api(request: ToolMetricsRequest):
-    try:
-        # Prepare tool_metrics dict
-        tool_metrics_dict = {
-            tool: {
-                "average_wer": metric.average_wer,
-                "best_wer": metric.best_wer,
-                "worst_wer": metric.worst_wer,
-                "total_files": metric.total_files
-            }
-            for tool, metric in request.tool_metrics.items()
-        }
+def save_tool_metrics(request: ToolMetricsRequest):
 
-        # Call DB function with all required parameters
-        response = update_tool_summary_metrics(
-            year=request.year,
-            month=request.month,
-            language=request.language,
-            tool_metrics=tool_metrics_dict
-        )
+    results = get_wer_results(
+        year=request.year,
+        month=request.month,
+        language=request.language
+    )
 
-        if not response.get("success", False):
-            raise HTTPException(status_code=500, detail=response.get("message", "Unknown error"))
+    if not results:
+        return {"status": "warning", "message": "No results found"}
 
-        return {"status": "success", "message": "Tool summary metrics saved/updated"}
+    response = update_tool_summary_metrics(
+        year=request.year,
+        month=request.month,
+        language=request.language,
+        results=results
+    )
 
-    except Exception as e:
-        print("❌ ERROR in save-tool-summary-metrics:", e)
-        raise HTTPException(status_code=500, detail=str(e))
+    if not response["success"]:
+        raise HTTPException(status_code=500, detail=response["message"])
 
+    return {"status": "success", "message": "Metrics saved"}
 
-        # =========================================================
+# =========================================================
 # ------------------ GET APIs ------------------------------
 # =========================================================
 
-# 4️⃣ GET WER RESULTS
-# -------------------------------
-# GET WER RESULTS (IMPORTANT)
-# -------------------------------
-from fastapi import HTTPException
-from app.database.mongo_connection import get_database
-from app.config import Config
+
+
+# @app.get("/api/wer/get-wer-results")
+# def get_results(year: int, month: str, language: str):
+#     return {"data": get_wer_results(year, month, language)}
+
+
+# @app.get("/api/wer/get-performance-metadata")
+# def get_metadata(year: int, month: str, language: str):
+#     return {"data": get_processing_metadata(year, month, language)}
+
+
+# @app.get("/api/wer/get-tool-summary-metrics")
+# def get_metrics(year: int, month: str, language: str):
+#     return {"data": get_tool_summary_metrics(year, month, language)}
 
 @app.get("/api/wer/get-wer-results")
-def get_wer_results_api(year: int = None, month: str = None, language: str = None):
+def get_wer_results_api(
+    year: Optional[int] = None,
+    month: Optional[str] = None,
+    language: Optional[str] = None
+):
     try:
         db = get_database()
-
-        if db is None:
-            raise Exception("Database connection failed")
-
-        col_name = Config.MONGODB_COLLECTIONS.get("wer_results")
-
-        if not col_name:
-            raise Exception("Collection name not found in config")
-
-        col = db[col_name]
-
-        # ✅ Build query safely
+        col = db[Config.MONGODB_COLLECTIONS["wer_results"]]
         query = {}
+
         if year:
             query["year"] = year
         if month:
             query["month"] = month
         if language:
             query["language"] = language
-
-        print("DEBUG QUERY:", query)
-
         docs = list(col.find(query, {"_id": 0}))
-
-        print("DB DOCS:", docs)
-
         final_data = []
 
         for doc in docs:
-            results = doc.get("results", [])
-
-            # ✅ Ensure it's a list
-            if not isinstance(results, list):
-                continue
-
-            for item in results:
+            for r in doc.get("results", []):
                 final_data.append({
-                    "language": doc.get("language", ""),
-                    "year": doc.get("year", ""),
-                    "month": doc.get("month", ""),
-                    "base_name": item.get("base_name", ""),
-                    "ai_tool": item.get("ai_tool", ""),
-                    "wer_score": item.get("wer_score", "")
+                    "year": doc.get("year"),
+                    "month": doc.get("month"),
+                    "language": doc.get("language"),
+                    "base_name": r.get("base_name"),
+                    "ai_tool": r.get("ai_tool"),
+                    "wer_score": r.get("wer_score")
                 })
 
         return {
             "status": "success",
+            "count": len(final_data),
             "data": final_data
         }
 
     except Exception as e:
-        print("❌ ERROR:", str(e))   # 🔥 IMPORTANT
         raise HTTPException(status_code=500, detail=str(e))
-        
-# 5️⃣ GET PROCESSING METADATA
+    
 @app.get("/api/wer/get-performance-metadata")
 def get_performance_metadata_api(year: int, month: str, language: str):
     try:
         data = get_processing_metadata(year, month, language)
 
         if not data:
-            return {"status": "success", "data": {}, "message": "No metadata found"}
+            return {
+                "status": "warning",
+                "message": "No metadata found",
+                "data": {}
+            }
 
-        return {"status": "success", "data": data}
+        return {
+            "status": "success",
+            "data": data
+        }
 
     except Exception as e:
+        print("❌ ERROR in get-performance-metadata:", e)
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# 6️⃣ GET TOOL SUMMARY METRICS
+    
 @app.get("/api/wer/get-tool-summary-metrics")
 def get_tool_summary_metrics_api(year: int, month: str, language: str):
     try:
         data = get_tool_summary_metrics(year, month, language)
 
         if not data:
-            return {"status": "success", "data": {}, "message": "No metrics found"}
+            return {
+                "status": "warning",
+                "message": "No metrics found",
+                "data": {}
+            }
 
-        return {"status": "success", "data": data}
+        return {
+            "status": "success",
+            "data": data
+        }
 
     except Exception as e:
+        print("❌ ERROR in get-tool-summary-metrics:", e)
         raise HTTPException(status_code=500, detail=str(e))
