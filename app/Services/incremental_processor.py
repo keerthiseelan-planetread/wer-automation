@@ -111,10 +111,7 @@ def process_with_incremental_caching(
             # Verify that actual WER results also exist - not just metadata
             existing_results_check = get_wer_results(year, month, language)
             if not existing_results_check:
-                logger.warning(
-                    f"Metadata has {len(cached_file_ids)} file IDs but WER results are empty. "
-                    "DB is in inconsistent state - forcing full reprocess."
-                )
+                # Inconsistent state detected - reset for full reprocess
                 cached_file_ids = []  # Reset so all files get reprocessed
             else:
                 logger.info(f"Found {len(cached_file_ids)} previously processed files with {len(existing_results_check)} WER results")

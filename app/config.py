@@ -23,6 +23,11 @@ class Config:
         "tool_summary_metrics": "tool_summary_metrics"
     }
 
+    # Scheduler Configuration
+    SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "True").lower() == "true"
+    SCHEDULER_TIME = os.getenv("SCHEDULER_TIME", "02:00")  # Format: "HH:MM" (24-hour)
+    SCHEDULER_TIMEZONE = os.getenv("SCHEDULER_TIMEZONE", "UTC")
+
     @staticmethod
     def validate():
         """Validate all configuration variables and their validity."""

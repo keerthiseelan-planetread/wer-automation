@@ -529,6 +529,110 @@ def save_wer_results(year: int, month: str, language: str, wer_results_list: Lis
         return {"success": True}
 
     except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error saving WER results: {error_msg}")
+        return {"success": False, "message": error_msg}
+
+
+def delete_empty_results(year: int, month: str, language: str) -> bool:
+    """
+    Delete WER result document if it contains 0 files processed.
+    Used to clean up empty folder results that shouldn't be stored.
+    
+    Args:
+        year: Year value
+        month: Month name
+        language: Language name
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        db = get_database()
+        wer_results_col = db[Config.MONGODB_COLLECTIONS["wer_results"]]
+        
+        param_hash = get_parameter_hash(year, month, language)
+        
+        # Delete the document if total_files_processed is 0
+        result = wer_results_col.delete_one({
+            "parameter_hash": param_hash,
+            "total_files_processed": 0
+        })
+        
+        if result.deleted_count > 0:
+            logger.info(f"Deleted empty result document for {year}/{month}/{language}")
+            return True
+        
+        return True  # No document to delete is also success
+        
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error deleting empty result: {error_msg}")
+        return False
+
+
+def merge_results(existing_results: List[Dict], new_results: List[Dict],
+                 deleted_file_ids: List[str] = None) -> List[Dict]:
+    """
+    Merge new WER calculations with existing cached results.
+    
+    Args:
+        existing_results: Results already in database
+        new_results: Newly calculated results
+        deleted_file_ids: File IDs that were deleted (to mark as archived)
+        
+    Returns:
+        List[Dict]: Merged results combining existing and new
+    """
+    try:
+        # Create dict for fast lookup of new results
+        new_results_dict = {
+            (r['base_name'], r['ai_tool']): r 
+            for r in new_results
+        }
+        
+        merged = []
+        
+        # Keep existing results that weren't deleted
+        for result in existing_results:
+            if result.get('google_drive_file_id') in (deleted_file_ids or []):
+                # Mark as archived if file was deleted
+                result['file_status'] = 'archived'
+                merged.append(result)
+            else:
+                # Check if this result was recalculated (new calculation)
+                key = (result['base_name'], result['ai_tool'])
+                if key in new_results_dict:
+                    # Use the new calculation
+                    merged.append(new_results_dict[key])
+                    del new_results_dict[key]
+                else:
+                    # Keep existing result
+                    merged.append(result)
+        
+        # Add any remaining new results that weren't in existing
+        merged.extend(new_results_dict.values())
+        
+        logger.info(f"Merged results: kept {len(existing_results)} existing, added {len(new_results_dict)} new")
+        return merged
+        
+    except Exception as e:
+        logger.error(f"Error merging results: {str(e)}")
+        return existing_results + new_results
+
+
+def get_all_results_for_parameters(year: int, month: str, language: str) -> List[Dict]:
+    """
+    Fetch all WER results for given parameters from database.
+    
+    Args:
+        year: Year value
+        month: Month name
+        language: Language name
+        
+    Returns:
+        List[Dict]: List of WER results, empty list if not found
+    """
         logger.error(f"Error saving results: {str(e)}")
         return {"success": False, "message": str(e)}
     
