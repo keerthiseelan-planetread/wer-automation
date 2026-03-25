@@ -633,9 +633,11 @@ def get_all_results_for_parameters(year: int, month: str, language: str) -> List
     Returns:
         List[Dict]: List of WER results, empty list if not found
     """
-        logger.error(f"Error saving results: {str(e)}")
-        return {"success": False, "message": str(e)}
-    
+    logger.error(f"Error fetching results: {str(e)}")
+    return {
+            "success": False,
+            "message": str(e)
+        }
     
 # ----------------------------
 # UPDATE METADATA
