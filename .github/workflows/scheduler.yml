@@ -1,10 +1,9 @@
 ﻿name: Daily WER Automation Scheduler
 
 on:
-  # Run twice daily: 10:30 AM and 10:15 PM UTC
+  # Run at 11:30 AM IST (6:00 AM UTC)
   schedule:
-    - cron: '30 13 * * *'  # 10:30 AM UTC
-    - cron: '05 22 * * *'  # 08:30 PM UTC
+    - cron: '0 6 * * *'  # 11:30 AM IST (6:00 AM UTC)
   
   # Allow manual trigger for testing
   workflow_dispatch:
