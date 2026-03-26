@@ -1,11 +1,7 @@
 ﻿name: Daily WER Automation Scheduler
 
 on:
-  # Run at 11:30 AM IST (6:00 AM UTC)
-  schedule:
-    - cron: '0 6 * * *'  # 11:30 AM IST (6:00 AM UTC)
-  
-  # Allow manual trigger for testing
+  # Manual trigger for testing
   workflow_dispatch:
     inputs:
       debug_mode:
@@ -13,7 +9,7 @@ on:
         required: false
         default: 'false'
   
-  # Allow trigger from external cron services
+  # Trigger from cron-job.org (reliable external scheduler)
   repository_dispatch:
     types: [scheduled-run]
 
