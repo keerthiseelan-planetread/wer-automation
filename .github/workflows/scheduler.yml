@@ -12,6 +12,10 @@ on:
         description: 'Enable debug logging'
         required: false
         default: 'false'
+  
+  # Allow trigger from external cron services
+  repository_dispatch:
+    types: [scheduled-run]
 
 jobs:
   run-scheduler:
