@@ -186,6 +186,9 @@ def home():
 # 1️⃣ SAVE WER RESULTS
 
 
+# -------------------------------
+# SAVE WER RESULTS API (FIXED)
+# -------------------------------
 @app.post("/api/wer/save-wer-results")
 def save_wer_results_api(request: SaveWERResultsRequest):
 
@@ -203,16 +206,20 @@ def save_wer_results_api(request: SaveWERResultsRequest):
                 "base_name": r.base_name,
                 "ai_tool": r.ai_tool,
                 "wer_score": r.wer_score,
-                "google_drive_file_id": r.google_drive_file_id or ""
+
+                # ✅ FIX: DO NOT FORCE EMPTY STRING
+                "google_drive_file_id": r.google_drive_file_id
             }
             for r in request.results
         ]
     )
 
     if not response["success"]:
+        print("❌ ERROR FROM DB:", response)
         raise HTTPException(status_code=500, detail=response["message"])
 
     return {"status": "success", "message": "WER results saved"}
+
 
 
 # 2️⃣ SAVE METADATA
@@ -277,6 +284,10 @@ def save_tool_metrics(request: ToolMetricsRequest):
 # def get_metrics(year: int, month: str, language: str):
 #     return {"data": get_tool_summary_metrics(year, month, language)}
 
+from fastapi import HTTPException
+from typing import Optional
+import os
+
 @app.get("/api/wer/get-wer-results")
 def get_wer_results_api(
     year: Optional[int] = None,
@@ -286,24 +297,34 @@ def get_wer_results_api(
     try:
         db = get_database()
         col = db[Config.MONGODB_COLLECTIONS["wer_results"]]
-        query = {}
 
+        query = {}
+       
         if year:
             query["year"] = year
         if month:
             query["month"] = month
         if language:
             query["language"] = language
+
         docs = list(col.find(query, {"_id": 0}))
         final_data = []
 
         for doc in docs:
             for r in doc.get("results", []):
+
+                file_name = r.get("file_name", "")
+                base_name = os.path.splitext(file_name)[0] if file_name else "N/A"
+
                 final_data.append({
+                    "language": doc.get("language"),
                     "year": doc.get("year"),
                     "month": doc.get("month"),
-                    "language": doc.get("language"),
-                    "base_name": r.get("base_name"),
+
+                    # ✅ IMPORTANT
+                    "file_name": file_name,
+                    "base_name": base_name,
+                    "base_name":doc.get("base_name", base_name),  # Try to get from doc, fallback to extracted base_name
                     "ai_tool": r.get("ai_tool"),
                     "wer_score": r.get("wer_score")
                 })

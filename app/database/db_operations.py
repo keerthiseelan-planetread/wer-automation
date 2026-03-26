@@ -386,7 +386,8 @@
 import logging
 import hashlib
 from datetime import datetime
-from typing import List, Dict, Tuple
+from typing import List, Dict
+
 from app.database.mongo_connection import get_database
 from app.config import Config
 
@@ -397,6 +398,34 @@ logger = logging.getLogger(__name__)
 # ----------------------------
 def get_parameter_hash(year: int, month: str, language: str) -> str:
     return hashlib.sha256(f"{year}_{month}_{language}".encode()).hexdigest()
+
+
+# ----------------------------
+# UNIQUE KEY (VERY IMPORTANT)
+# ----------------------------
+def make_unique_key(r):
+    return f"{r.get('base_name','').strip().lower()}__{r.get('ai_tool','').strip().lower()}"
+
+
+# ----------------------------
+# REMOVE DUPLICATES FROM INPUT
+# ----------------------------
+def remove_input_duplicates(results: List[Dict]) -> List[Dict]:
+    unique = {}
+    for r in results:
+        key = make_unique_key(r)
+        unique[key] = r
+    return list(unique.values())
+
+
+
+# ----------------------------
+# IDENTIFY NEW & DELETED FILES
+# ----------------------------
+def identify_new_files(current: List[str], processed: List[str]):
+    new_files = list(set(current) - set(processed))
+    deleted_files = list(set(processed) - set(current))
+    return new_files, deleted_files
 
 
 # ----------------------------
@@ -428,56 +457,34 @@ def get_wer_results(year: int, month: str, language: str) -> List[Dict]:
 
 
 # ----------------------------
-# IDENTIFY FILES
+# MERGE RESULTS (FINAL FIX)
 # ----------------------------
-def identify_new_files(current: List[str], processed: List[str]) -> Tuple[List[str], List[str]]:
-    return list(set(current) - set(processed)), list(set(processed) - set(current))
-
-
-# ----------------------------
-# MERGE RESULTS (🔥 FIXED)
-# ----------------------------
-def merge_results(existing: List[Dict], new: List[Dict], deleted_ids: List[str] = None) -> List[Dict]:
-    deleted_ids = deleted_ids or []
-
-    # ✅ Use file_id as unique key
-    existing_dict = {
-        r.get("google_drive_file_id"): r
-        for r in existing if r.get("google_drive_file_id")
-    }
-
-    new_dict = {
-        r.get("google_drive_file_id"): r
-        for r in new if r.get("google_drive_file_id")
-    }
+def merge_results(existing: List[Dict], new: List[Dict], deleted_ids: List[str]) -> List[Dict]:
+    existing_map = {make_unique_key(r): r for r in existing}
+    new_map = {make_unique_key(r): r for r in new}
 
     merged = []
 
-    # ✅ Handle existing
-    for file_id, old in existing_dict.items():
+    for key, old in existing_map.items():
 
-        # 🔴 If deleted → archive
-        if file_id in deleted_ids:
+        if old.get("google_drive_file_id") in deleted_ids:
             old["file_status"] = "archived"
             merged.append(old)
 
-        # 🟢 If updated → replace
-        elif file_id in new_dict:
-            merged.append(new_dict[file_id])
-            del new_dict[file_id]
-
-        # ⚪ If unchanged → keep
+        elif key in new_map:
+            merged.append(new_map[key])
+            del new_map[key]
         else:
             merged.append(old)
 
-    # ✅ Add remaining new
-    merged.extend(new_dict.values())
+    merged.extend(new_map.values())
 
     return merged
 
 
+
 # ----------------------------
-# SAVE RESULTS (🔥 DUP FIX)
+# SAVE RESULTS (FINAL FIX)
 # ----------------------------
 def save_wer_results(year: int, month: str, language: str, wer_results_list: List[Dict]):
     try:
@@ -487,158 +494,101 @@ def save_wer_results(year: int, month: str, language: str, wer_results_list: Lis
         param_hash = get_parameter_hash(year, month, language)
         now = datetime.utcnow()
 
-        existing = col.find_one({"parameter_hash": param_hash})
+        existing_doc = col.find_one({"parameter_hash": param_hash})
+        existing_results = existing_doc.get("results", []) if existing_doc else []
 
-        # ✅ Normalize data
-        for r in wer_results_list:
-            r.setdefault("processed_timestamp", now)
-            r.setdefault("file_status", "current")
-            r["ai_tool"] = r.get("ai_tool", "").lower().title()
+        # ✅ STEP 1: REMOVE INPUT DUPLICATES
+        wer_results_list = remove_input_duplicates(wer_results_list)
 
-        # 🔥 FIX: handle empty file_id
-        unique = {}
+        clean_results = []
+
         for r in wer_results_list:
+
+            # normalize
+            r["ai_tool"] = r.get("ai_tool", "").strip().title()
+            r["base_name"] = r.get("base_name", "").strip()
+
+            # stable ID
             file_id = r.get("google_drive_file_id")
 
-            # ✅ fallback unique key if empty
-            key = file_id if file_id else str(id(r))
+            if not file_id:
+                file_id = hashlib.md5(
+                    make_unique_key(r).encode()
+                ).hexdigest()
+                r["google_drive_file_id"] = file_id
 
-            unique[key] = r
+            r["processed_timestamp"] = now
+            r["file_status"] = "current"
 
-        wer_results_list = list(unique.values())
+            clean_results.append(r)
 
-        # 🚨 Prevent saving empty data
-        if not wer_results_list:
-            return {"success": False, "message": "No valid results to save"}
+        if not clean_results:
+            return {"success": False, "message": "No valid results"}
 
+        # -------------------------
+        # COMPARE
+        # -------------------------
+        existing_ids = [r.get("google_drive_file_id") for r in existing_results]
+        new_ids = [r.get("google_drive_file_id") for r in clean_results]
+
+        added_ids = list(set(new_ids) - set(existing_ids))
+        deleted_ids = list(set(existing_ids) - set(new_ids))
+
+        # -------------------------
+        # MERGE
+        # -------------------------
+        merged_results = merge_results(existing_results, clean_results, deleted_ids)
+
+        # -------------------------
+        # FINAL DEDUP (STRONG)
+        # -------------------------
+        final_map = {}
+        for r in merged_results:
+            key = make_unique_key(r)
+            final_map[key] = r
+
+        merged_results = list(final_map.values())
+
+        # -------------------------
+        # NO CHANGE → SKIP SAVE
+        # -------------------------
+        if not added_ids and not deleted_ids:
+            col.update_one(
+                {"parameter_hash": param_hash},
+                {"$set": {"last_updated": now}}
+            )
+            print("✅ No changes → NOT saving again")
+            return {"success": True}
+
+        # -------------------------
+        # SAVE
+        # -------------------------
         doc = {
             "parameter_hash": param_hash,
             "year": year,
             "month": month,
             "language": language,
-            "results": wer_results_list,
-            "total_files_processed": len(wer_results_list),
+            "results": merged_results,
+            "total_files_processed": len([
+                r for r in merged_results if r.get("file_status") != "archived"
+            ]),
             "last_updated": now,
-            "created_at": existing.get("created_at", now) if existing else now
+            "created_at": existing_doc.get("created_at", now) if existing_doc else now
         }
 
         col.replace_one({"parameter_hash": param_hash}, doc, upsert=True)
 
-        print("✅ FINAL SAVED LIST:", wer_results_list)
+        print("✅ FINAL SAVED:", len(merged_results))
 
         return {"success": True}
 
     except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Error saving WER results: {error_msg}")
-        return {"success": False, "message": error_msg}
+        logger.error(f"Error saving WER results: {str(e)}")
+        return {"success": False, "message": str(e)}
 
 
-def delete_empty_results(year: int, month: str, language: str) -> bool:
-    """
-    Delete WER result document if it contains 0 files processed.
-    Used to clean up empty folder results that shouldn't be stored.
-    
-    Args:
-        year: Year value
-        month: Month name
-        language: Language name
-        
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    try:
-        db = get_database()
-        wer_results_col = db[Config.MONGODB_COLLECTIONS["wer_results"]]
-        
-        param_hash = get_parameter_hash(year, month, language)
-        
-        # Delete the document if total_files_processed is 0
-        result = wer_results_col.delete_one({
-            "parameter_hash": param_hash,
-            "total_files_processed": 0
-        })
-        
-        if result.deleted_count > 0:
-            logger.info(f"Deleted empty result document for {year}/{month}/{language}")
-            return True
-        
-        return True  # No document to delete is also success
-        
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Error deleting empty result: {error_msg}")
-        return False
 
 
-def merge_results(existing_results: List[Dict], new_results: List[Dict],
-                 deleted_file_ids: List[str] = None) -> List[Dict]:
-    """
-    Merge new WER calculations with existing cached results.
-    
-    Args:
-        existing_results: Results already in database
-        new_results: Newly calculated results
-        deleted_file_ids: File IDs that were deleted (to mark as archived)
-        
-    Returns:
-        List[Dict]: Merged results combining existing and new
-    """
-    try:
-        # Create dict for fast lookup of new results
-        new_results_dict = {
-            (r['base_name'], r['ai_tool']): r 
-            for r in new_results
-        }
-        
-        merged = []
-        
-        # Keep existing results that weren't deleted
-        for result in existing_results:
-            if result.get('google_drive_file_id') in (deleted_file_ids or []):
-                # Mark as archived if file was deleted
-                result['file_status'] = 'archived'
-                merged.append(result)
-            else:
-                # Check if this result was recalculated (new calculation)
-                key = (result['base_name'], result['ai_tool'])
-                if key in new_results_dict:
-                    # Use the new calculation
-                    merged.append(new_results_dict[key])
-                    del new_results_dict[key]
-                else:
-                    # Keep existing result
-                    merged.append(result)
-        
-        # Add any remaining new results that weren't in existing
-        merged.extend(new_results_dict.values())
-        
-        logger.info(f"Merged results: kept {len(existing_results)} existing, added {len(new_results_dict)} new")
-        return merged
-        
-    except Exception as e:
-        logger.error(f"Error merging results: {str(e)}")
-        return existing_results + new_results
-
-
-def get_all_results_for_parameters(year: int, month: str, language: str) -> List[Dict]:
-    """
-    Fetch all WER results for given parameters from database.
-    
-    Args:
-        year: Year value
-        month: Month name
-        language: Language name
-        
-    Returns:
-        List[Dict]: List of WER results, empty list if not found
-    """
-    logger.error(f"Error fetching results: {str(e)}")
-    return {
-            "success": False,
-            "message": str(e)
-        }
-    
 # ----------------------------
 # UPDATE METADATA
 # ----------------------------
@@ -656,7 +606,7 @@ def update_processing_metadata(year: int, month: str, language: str, file_ids: L
             "year": year,
             "month": month,
             "language": language,
-            "processed_file_ids": list(set(file_ids)),  # remove duplicates
+            "processed_file_ids": list(set(file_ids)),
             "last_sync_timestamp": now,
             "last_drive_folder_scan": now,
             "created_at": existing.get("created_at", now) if existing else now
@@ -672,27 +622,7 @@ def update_processing_metadata(year: int, month: str, language: str, file_ids: L
 
 
 # ----------------------------
-# DELETE EMPTY RESULTS
-# ----------------------------
-def delete_empty_results(year: int, month: str, language: str) -> bool:
-    try:
-        db = get_database()
-        col = db[Config.MONGODB_COLLECTIONS["wer_results"]]
-
-        result = col.delete_one({
-            "parameter_hash": get_parameter_hash(year, month, language),
-            "total_files_processed": 0
-        })
-
-        return True
-
-    except Exception as e:
-        logger.error(f"Error deleting empty results: {str(e)}")
-        return False
-
-
-# ----------------------------
-# TOOL METRICS (AUTO CALC)
+# TOOL METRICS
 # ----------------------------
 def update_tool_summary_metrics(year: int, month: str, language: str, results: List[Dict]):
     try:
@@ -708,10 +638,7 @@ def update_tool_summary_metrics(year: int, month: str, language: str, results: L
             tool = r.get("ai_tool", "Unknown")
             wer = float(r.get("wer_score", 0))
 
-            if tool not in tool_data:
-                tool_data[tool] = []
-
-            tool_data[tool].append(wer)
+            tool_data.setdefault(tool, []).append(wer)
 
         summary = {}
 
@@ -740,7 +667,9 @@ def update_tool_summary_metrics(year: int, month: str, language: str, results: L
 
     except Exception as e:
         logger.error(f"Error updating metrics: {str(e)}")
-        return {"success": False, "message": str(e)}  
+        return {"success": False, "message": str(e)}
+
+
 # ----------------------------
 # GET METADATA
 # ----------------------------
@@ -760,6 +689,8 @@ def get_processing_metadata(year: int, month: str, language: str) -> Dict:
         }
 
     return {}
+
+
 # ----------------------------
 # GET TOOL METRICS
 # ----------------------------
