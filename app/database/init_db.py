@@ -115,28 +115,3 @@ def _create_indexes(db):
         logger.error(f"Unexpected error creating indexes: {str(e)}")
         raise
 
-
-def drop_database():
-    """Drop entire database (useful for development/testing only)."""
-    try:
-        client = get_database().client
-        client.drop_database(Config.MONGODB_DB_NAME)
-        logger.info(f"Dropped database: {Config.MONGODB_DB_NAME}")
-    except Exception as e:
-        logger.error(f"Failed to drop database: {str(e)}")
-        raise
-
-
-def get_database_stats():
-    """Get database statistics for monitoring."""
-    try:
-        db = get_database()
-        stats = db.command("dbStats")
-        return {
-            "storage_size": stats.get("storageSize"),
-            "data_size": stats.get("dataSize"),
-            "collections": stats.get("collections")
-        }
-    except Exception as e:
-        logger.error(f"Failed to get database stats: {str(e)}")
-        return None

@@ -595,16 +595,52 @@ if st.session_state["generating_report"]:
         progress_bar.progress(40)
 
         # Only proceed with processing if folders exist
+        original_id = original_folder[0]["id"]
+        ai_id = ai_folder[0]["id"]
+
+        # 3️⃣ Check if folders contain files
+        with status_placeholder.container():
+            st.info("📄 Checking for SRT files in folders...")
+
+        try:
+            from app.drive.drive_utils import list_srt_files
+            original_files = list_srt_files(service, original_id)
+            ai_files = list_srt_files(service, ai_id)
+        except Exception as e:
+            status_placeholder.empty()
+            progress_placeholder.empty()
+            st.session_state["generating_report"] = False
+            st.session_state["show_results"] = False
+            st.error(f"❌ Error listing files from folders: {str(e)[:100]}")
+            st.stop()
+
+        # Check if folders are empty
+        if not original_files or not ai_files:
+            status_placeholder.empty()
+            progress_placeholder.empty()
+            st.session_state["generating_report"] = False
+            
+            # Show specific message based on which folder is empty
+            if not original_files and not ai_files:
+                error_msg = "❌ Both Original_Files and AI_Generated_Files folders are empty.\n\nPlease ensure there are SRT files in both folders for the selected language, month, and year."
+            elif not original_files:
+                error_msg = "❌ Original_Files folder is empty.\n\nPlease ensure there are SRT files in the Original_Files folder for the selected language, month, and year."
+            else:
+                error_msg = "❌ AI_Generated_Files folder is empty.\n\nPlease ensure there are SRT files in the AI_Generated_Files folder for the selected language, month, and year."
+            
+            st.session_state["processing_error"] = error_msg
+            st.session_state.pop("wer_results", None)
+            st.rerun()
+
+        progress_bar.progress(50)
+
         with st.spinner("⏳ Processing WER report... This may take a moment"):
             
-            original_id = original_folder[0]["id"]
-            ai_id = ai_folder[0]["id"]
-
-            # ⚡ Initialize Database and Process with Incremental Caching
-            with status_placeholder.container():
-                st.info("🗄️ Checking database for cached results...")
-            
             try:
+                # ⚡ Initialize Database and Process with Incremental Caching
+                with status_placeholder.container():
+                    st.info("🗄️ Checking database for cached results...")
+                
                 # Define progress callback for WER calculation
                 def update_progress(current, total):
                     """Update progress bar during WER calculation."""
@@ -712,6 +748,7 @@ if st.session_state["generating_report"]:
                     st.warning("❌ No matching SRT file pairs found. Please ensure you have both original and AI-generated SRT files for the selected language, month, and year.")
                     st.session_state["generating_report"] = False
                     st.session_state["show_results"] = False
+                    st.rerun()
                     
             except Exception as e:
                 progress_placeholder.empty()
