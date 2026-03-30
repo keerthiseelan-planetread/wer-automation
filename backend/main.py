@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from app.database.mongo_connection import get_database
 from app.database.init_db import initialize_database
@@ -56,12 +57,28 @@ class PerformanceMetadataRequest(BaseModel):
     language: str
     processed_file_ids: List[str]
 
-from pydantic import BaseModel
 class ToolMetricsRequest(BaseModel):
     year: int
     month: str
     language: str
 
+
+# ===== IMPORT & REGISTER ROUTERS =====
+from backend.routers.health import router as health_router
+from backend.routers.auth_routers import router as auth_router
+from backend.routers.wer_routers import router as wer_router
+from backend.routers.db import router as db_router
+from backend.routers.process import router as process_router
+from backend.routers.results import router as results_router
+
+app.include_router(health_router, prefix="/health", tags=["health"])
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(wer_router, prefix="/wer", tags=["wer"])
+app.include_router(db_router, prefix="/db", tags=["db"])
+app.include_router(process_router, prefix="/process", tags=["process"])
+app.include_router(results_router, prefix="/results", tags=["results"])
+
+# ===== END ROUTERS =====
 
 
 # -------------------------------
@@ -141,10 +158,6 @@ def save_tool_metrics(request: ToolMetricsRequest):
         language=request.language
     )
 
-    if not results:
-        return {"status": "warning", "message": "No results found"}
-
-    response = update_tool_summary_metrics(
         year=request.year,
         month=request.month,
         language=request.language,
@@ -198,11 +211,8 @@ def get_wer_results_api(
                     # ✅ IMPORTANT
                     "file_name": file_name,
                     "base_name": base_name,
-                    "base_name":doc.get("base_name", base_name),  # Try to get from doc, fallback to extracted base_name
-                    "ai_tool": r.get("ai_tool"),
-                    "wer_score": r.get("wer_score")
-                })
-
+                    "file_name": file_name,
+                    "base_name": doc.get("base_name", base_name),
         return {
             "status": "success",
             "count": len(final_data),
