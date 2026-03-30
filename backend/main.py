@@ -2,6 +2,12 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+import sys
+from pathlib import Path
+
+# Add parent directory to path so we can import 'app'
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from fastapi.middleware.cors import CORSMiddleware
 from app.database.mongo_connection import get_database
 from app.database.init_db import initialize_database
