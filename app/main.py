@@ -1,6 +1,11 @@
 import sys
 import os
 import requests
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
 # Ensure workspace root is in Python path for module imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # ✅ MongoDB Imports
@@ -8,6 +13,9 @@ from app.database.init_db import initialize_database
 from app.database.mongo_connection import get_database
 
 import streamlit as st
+
+# ===== BACKEND API CONFIGURATION =====
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
 from app.wer_engine.wer_calculater import calculate_wer
 from app.config import Config
 from app.auth.login import login_user, logout_user
@@ -54,7 +62,7 @@ def save_all_results_to_db():
         }
 
         r1 = requests.post(
-            "http://localhost:8000/api/wer/save-wer-results",
+            f"{BACKEND_API_URL}/api/wer/save-wer-results",
             json=wer_payload,
             timeout=10
         )
@@ -73,7 +81,7 @@ def save_all_results_to_db():
         }
 
         r2 = requests.post(
-            "http://localhost:8000/api/wer/save-performance-metadata",
+            f"{BACKEND_API_URL}/api/wer/save-performance-metadata",
             json=performance_payload,
             timeout=10
         )
@@ -105,7 +113,7 @@ def save_all_results_to_db():
         }
 
         r3 = requests.post(
-            "http://localhost:8000/api/wer/save-tool-summary-metrics",
+            f"{BACKEND_API_URL}/api/wer/save-tool-summary-metrics",
             json=tool_metrics_payload,
             timeout=10
         )
@@ -118,7 +126,6 @@ def save_all_results_to_db():
     except Exception as e:
         st.error(f"⚠️ Unexpected Error: {str(e)}")
 
-BACKEND_API_URL = "http://localhost:8000/api/wer/save"
 # Configure page
 st.set_page_config(
     page_title="WER Automation Dashboard",
