@@ -1,5 +1,3 @@
-
-
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
@@ -158,25 +156,7 @@ def save_tool_metrics(request: ToolMetricsRequest):
 
     return {"status": "success", "message": "Metrics saved"}
 
-# =========================================================
-# ------------------ GET APIs ------------------------------
-# =========================================================
 
-
-
-# @app.get("/api/wer/get-wer-results")
-# def get_results(year: int, month: str, language: str):
-#     return {"data": get_wer_results(year, month, language)}
-
-
-# @app.get("/api/wer/get-performance-metadata")
-# def get_metadata(year: int, month: str, language: str):
-#     return {"data": get_processing_metadata(year, month, language)}
-
-
-# @app.get("/api/wer/get-tool-summary-metrics")
-# def get_metrics(year: int, month: str, language: str):
-#     return {"data": get_tool_summary_metrics(year, month, language)}
 
 from fastapi import HTTPException
 from typing import Optional
@@ -273,3 +253,8 @@ def get_tool_summary_metrics_api(year: int, month: str, language: str):
     except Exception as e:
         print("❌ ERROR in get-tool-summary-metrics:", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
