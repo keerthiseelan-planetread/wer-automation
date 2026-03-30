@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
-from backend.schemas.results import ResultsResponse
 from backend.services.results import fetch_results, stream_results_csv
 from backend.core.security import get_current_user
 
 router = APIRouter()
 
 
-@router.get("/", response_model=ResultsResponse)
+@router.get("/")
 def list_results(
     year: int = Query(...),
     month: int = Query(...),
