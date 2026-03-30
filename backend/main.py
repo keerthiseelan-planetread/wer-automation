@@ -158,6 +158,10 @@ def save_tool_metrics(request: ToolMetricsRequest):
         language=request.language
     )
 
+    if not results:
+        return {"status": "warning", "message": "No results found"}
+
+    response = update_tool_summary_metrics(
         year=request.year,
         month=request.month,
         language=request.language,
@@ -169,11 +173,6 @@ def save_tool_metrics(request: ToolMetricsRequest):
 
     return {"status": "success", "message": "Metrics saved"}
 
-
-
-from fastapi import HTTPException
-from typing import Optional
-import os
 
 @app.get("/api/wer/get-wer-results")
 def get_wer_results_api(
@@ -207,12 +206,12 @@ def get_wer_results_api(
                     "language": doc.get("language"),
                     "year": doc.get("year"),
                     "month": doc.get("month"),
-
-                    # ✅ IMPORTANT
-                    "file_name": file_name,
-                    "base_name": base_name,
                     "file_name": file_name,
                     "base_name": doc.get("base_name", base_name),
+                    "ai_tool": r.get("ai_tool"),
+                    "wer_score": r.get("wer_score")
+                })
+
         return {
             "status": "success",
             "count": len(final_data),
