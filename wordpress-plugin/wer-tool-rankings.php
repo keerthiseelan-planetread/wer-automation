@@ -190,6 +190,24 @@ function wer_render_tool_rankings($atts) {
                 font-size: 20px;
             }
 
+            .wer-metrics {
+                text-align: center;
+                font-weight: 600;
+                color: #0073aa;
+            }
+
+            .wer-metric-badge {
+                display: inline-block;
+                background: #e8f4f9;
+                color: #0073aa;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 14px;
+                font-weight: 700;
+                min-width: 80px;
+                text-align: center;
+            }
+
             .wer-footer {
                 margin-top: 20px;
                 text-align: center;
@@ -327,6 +345,7 @@ function wer_render_tool_rankings($atts) {
                             <tr>
                                 <th>Rank</th>
                                 <th>AI Tool</th>
+                                <th>Average WER</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -341,6 +360,7 @@ function wer_render_tool_rankings($atts) {
                     <tr>
                         <td class="wer-rank ${rankClass}">${medal}</td>
                         <td><strong>${wer_escape_html(item.tool)}</strong></td>
+                        <td class="wer-metrics"><span class="wer-metric-badge">${item.avgWer.toFixed(2)}%</span></td>
                     </tr>
                 `;
             });
