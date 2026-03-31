@@ -20,8 +20,6 @@ add_shortcode('wer_tool_rankings', 'wer_render_tool_rankings');
 function wer_render_tool_rankings($atts) {
     // Parse shortcode attributes
     $atts = shortcode_atts(array(
-        'year' => date('Y'),
-        'month' => date('F'),
         'backend_url' => 'https://wer-automation-api.onrender.com'
     ), $atts);
 
