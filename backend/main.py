@@ -57,32 +57,38 @@ class SaveWERResultsRequest(BaseModel):
     language: str
     results: List[WERResult]
 
-class PerformanceMetadataRequest(BaseModel):
-    year: int
-    month: str
-    language: str
-    processed_file_ids: List[str]
+# ========== COMMENTED OUT - NOT USED FOR WORDPRESS ==========
+# class PerformanceMetadataRequest(BaseModel):
+#     year: int
+#     month: str
+#     language: str
+#     processed_file_ids: List[str]
+# ============================================================
 
 class ToolMetricsRequest(BaseModel):
     year: int
     month: str
     language: str
 
+===== COMMENTED OUT ROUTERS - NOT USED FOR WORDPRESS ==========
+# from backend.routers.auth_routers import router as auth_router
+# from backend.routers.db import router as db_router
+# from backend.routers.process import router as process_router
+# from backend.routers.results import router as results_router
+#
+# app.include_router(auth_router, prefix="/auth", tags=["auth"])
+# app.include_router(db_router, prefix="/db", tags=["db"])
+# app.include_router(process_router, prefix="/process", tags=["process"])
+# app.include_router(results_router, prefix="/results", tags=["results"])
+# ======================================================================
 
+# =====
 # ===== IMPORT & REGISTER ROUTERS =====
 from backend.routers.health import router as health_router
-from backend.routers.auth_routers import router as auth_router
 from backend.routers.wer_routers import router as wer_router
-from backend.routers.db import router as db_router
-from backend.routers.process import router as process_router
-from backend.routers.results import router as results_router
 
 app.include_router(health_router, prefix="/health", tags=["health"])
-app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(wer_router, prefix="/wer", tags=["wer"])
-app.include_router(db_router, prefix="/db", tags=["db"])
-app.include_router(process_router, prefix="/process", tags=["process"])
-app.include_router(results_router, prefix="/results", tags=["results"])
 
 # ===== END ROUTERS =====
 
@@ -144,25 +150,9 @@ def save_metadata(request: PerformanceMetadataRequest):
     response = update_processing_metadata(
         year=request.year,
         month=request.month,
-        language=request.language,
-        file_ids=request.processed_file_ids
-    )
-
-    if not response["success"]:
-        raise HTTPException(status_code=500, detail=response["message"])
-
-    return {"status": "success", "message": "Metadata saved"}
-
-
+# =========================================================
 # 3️⃣ SAVE TOOL METRICS (AUTO)
-@app.post("/api/wer/save-tool-summary-metrics")
-def save_tool_metrics(request: ToolMetricsRequest):
-
-    results = get_wer_results(
-        year=request.year,
-        month=request.month,
-        language=request.language
-    )
+# =========================================================
 
     if not results:
         return {"status": "warning", "message": "No results found"}
@@ -236,27 +226,6 @@ def get_performance_metadata_api(year: int, month: str, language: str):
             return {
                 "status": "warning",
                 "message": "No metadata found",
-                "data": {}
-            }
-
-        return {
-            "status": "success",
-            "data": data
-        }
-
-    except Exception as e:
-        print("❌ ERROR in get-performance-metadata:", e)
-        raise HTTPException(status_code=500, detail=str(e))
-    
-@app.get("/api/wer/get-tool-summary-metrics")
-def get_tool_summary_metrics_api(year: int, month: str, language: str):
-    try:
-        data = get_tool_summary_metrics(year, month, language)
-
-        if not data:
-            return {
-                "status": "warning",
-                "message": "No metrics found",
                 "data": {}
             }
 
