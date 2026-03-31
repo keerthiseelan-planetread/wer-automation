@@ -105,30 +105,75 @@ def save_tool_summary_metrics_api(request: ToolMetricsRequest):
 
 
 @app.get("/api/wer/get-tool-summary-metrics")
-def get_tool_summary_metrics_api(
-    year: int,
-    month: str,
-    language: str
-):
+def get_tool_summary_metrics_api(language: str):
     """
-    Get aggregated tool summary metrics (avg WER per tool).
-    Returns data formatted for WordPress top 10 ranking display.
+    Get aggregated tool summary metrics for a language across ALL months.
+    Returns top 10 AI tools ranked by lowest average WER.
     
-    Example: /api/wer/get-tool-summary-metrics?year=2024&month=January&language=en
+    Example: /api/wer/get-tool-summary-metrics?language=hi
     """
     try:
-        data = get_tool_summary_metrics(year, month, language)
-
-        if not data:
+        from app.database.mongo_connection import get_database
+        from app.config import Config
+        
+        db = get_database()
+        col = db[Config.MONGODB_COLLECTIONS["tool_summary_metrics"]]
+        
+        # Fetch all documents for this language across all months/years
+        docs = list(col.find({"language": language}, {"_id": 0}))
+        
+        if not docs:
             return {
                 "status": "warning",
-                "message": "No metrics found for given parameters",
+                "message": "No metrics found for this language",
                 "data": {}
             }
-
+        
+        # Aggregate tool metrics across all months
+        aggregated_metrics = {}
+        
+        for doc in docs:
+            tool_metrics = doc.get("tool_metrics", {})
+            
+            for tool_name, metrics in tool_metrics.items():
+                if tool_name not in aggregated_metrics:
+                    aggregated_metrics[tool_name] = {
+                        "total_wer": 0,
+                        "count": 0,
+                        "best_wer": float('inf'),
+                        "worst_wer": 0,
+                        "total_files": 0
+                    }
+                
+                # Aggregate data
+                avg_wer = float(metrics.get("average_wer", 0))
+                best_wer = float(metrics.get("best_wer", 0))
+                worst_wer = float(metrics.get("worst_wer", 0))
+                files = metrics.get("files_count", 0)
+                
+                aggregated_metrics[tool_name]["total_wer"] += avg_wer
+                aggregated_metrics[tool_name]["count"] += 1
+                aggregated_metrics[tool_name]["best_wer"] = min(
+                    aggregated_metrics[tool_name]["best_wer"], best_wer
+                )
+                aggregated_metrics[tool_name]["worst_wer"] = max(
+                    aggregated_metrics[tool_name]["worst_wer"], worst_wer
+                )
+                aggregated_metrics[tool_name]["total_files"] += files
+        
+        # Calculate final averages
+        final_metrics = {}
+        for tool_name, metrics in aggregated_metrics.items():
+            final_metrics[tool_name] = {
+                "average_wer": round(metrics["total_wer"] / metrics["count"], 2),
+                "best_wer": round(metrics["best_wer"], 2),
+                "worst_wer": round(metrics["worst_wer"], 2),
+                "files_count": metrics["total_files"]
+            }
+        
         return {
             "status": "success",
-            "data": data
+            "data": final_metrics
         }
 
     except Exception as e:

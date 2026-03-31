@@ -251,15 +251,13 @@ function wer_render_tool_rankings($atts) {
         </div>
 
         <div class="wer-footer">
-            <p>Data from WER Automation Backend | Year: <?php echo $atts['year']; ?> | Month: <?php echo $atts['month']; ?></p>
+            <p>Top 10 AI Tools Rankings - Aggregated Across All Months</p>
         </div>
     </div>
 
     <script>
         const WER_CONFIG = {
-            backendUrl: '<?php echo $atts['backend_url']; ?>',
-            year: <?php echo $atts['year']; ?>,
-            month: '<?php echo $atts['month']; ?>'
+            backendUrl: '<?php echo $atts['backend_url']; ?>'
         };
 
         // Load rankings on page load
@@ -274,8 +272,8 @@ function wer_render_tool_rankings($atts) {
             // Show loading state
             contentDiv.innerHTML = '<div class="wer-loading"><div class="wer-loading-spinner"></div><p>Loading rankings...</p></div>';
 
-            // Build API URL
-            const apiUrl = `${WER_CONFIG.backendUrl}/api/wer/get-tool-summary-metrics?year=${WER_CONFIG.year}&month=${WER_CONFIG.month}&language=${language}`;
+            // Build API URL - only language parameter needed
+            const apiUrl = `${WER_CONFIG.backendUrl}/api/wer/get-tool-summary-metrics?language=${language}`;
 
             // Fetch data from backend
             fetch(apiUrl, {
