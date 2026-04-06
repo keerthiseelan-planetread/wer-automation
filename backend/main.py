@@ -107,73 +107,59 @@ def save_tool_summary_metrics_api(request: ToolMetricsRequest):
 @app.get("/api/wer/get-tool-summary-metrics")
 def get_tool_summary_metrics_api(language: str):
     """
-    Get aggregated tool summary metrics for a language across ALL months.
-    Returns top 10 AI tools ranked by lowest average WER.
+    Get tool summary metrics for selected language.
+    Auto-detects current month and fetches data.
+    If no data for current month, falls back to previous month.
     
     Example: /api/wer/get-tool-summary-metrics?language=hi
     """
     try:
         from app.database.mongo_connection import get_database
         from app.config import Config
+        from datetime import datetime, timedelta
         
         db = get_database()
         col = db[Config.MONGODB_COLLECTIONS["tool_summary_metrics"]]
         
-        # Fetch all documents for this language across all months/years
-        docs = list(col.find({"language": language}, {"_id": 0}))
+        # Get current month and year
+        now = datetime.now()
+        current_month = now.strftime("%B")  # e.g., "April"
+        current_year = now.year  # e.g., 2026
         
-        if not docs:
+        # Try to fetch current month data
+        doc = col.find_one({
+            "language": language,
+            "year": current_year,
+            "month": current_month
+        }, {"_id": 0})
+        
+        # If no current month data, try previous month
+        if not doc:
+            # Go back one month
+            previous_date = now - timedelta(days=30)
+            previous_month = previous_date.strftime("%B")
+            previous_year = previous_date.year
+            
+            doc = col.find_one({
+                "language": language,
+                "year": previous_year,
+                "month": previous_month
+            }, {"_id": 0})
+        
+        # If still no data found
+        if not doc:
             return {
                 "status": "warning",
-                "message": "No metrics found for this language",
+                "message": f"No metrics found for {language} in current or previous month",
                 "data": {}
             }
         
-        # Aggregate tool metrics across all months
-        aggregated_metrics = {}
-        
-        for doc in docs:
-            tool_metrics = doc.get("tool_metrics", {})
-            
-            for tool_name, metrics in tool_metrics.items():
-                if tool_name not in aggregated_metrics:
-                    aggregated_metrics[tool_name] = {
-                        "total_wer": 0,
-                        "count": 0,
-                        "best_wer": float('inf'),
-                        "worst_wer": 0,
-                        "total_files": 0
-                    }
-                
-                # Aggregate data
-                avg_wer = float(metrics.get("average_wer", 0))
-                best_wer = float(metrics.get("best_wer", 0))
-                worst_wer = float(metrics.get("worst_wer", 0))
-                files = metrics.get("files_count", 0)
-                
-                aggregated_metrics[tool_name]["total_wer"] += avg_wer
-                aggregated_metrics[tool_name]["count"] += 1
-                aggregated_metrics[tool_name]["best_wer"] = min(
-                    aggregated_metrics[tool_name]["best_wer"], best_wer
-                )
-                aggregated_metrics[tool_name]["worst_wer"] = max(
-                    aggregated_metrics[tool_name]["worst_wer"], worst_wer
-                )
-                aggregated_metrics[tool_name]["total_files"] += files
-        
-        # Calculate final averages
-        final_metrics = {}
-        for tool_name, metrics in aggregated_metrics.items():
-            final_metrics[tool_name] = {
-                "average_wer": round(metrics["total_wer"] / metrics["count"], 2),
-                "best_wer": round(metrics["best_wer"], 2),
-                "worst_wer": round(metrics["worst_wer"], 2),
-                "files_count": metrics["total_files"]
-            }
+        # Return the tool metrics
+        tool_metrics = doc.get("tool_metrics", {})
         
         return {
             "status": "success",
-            "data": final_metrics
+            "data": tool_metrics
         }
 
     except Exception as e:

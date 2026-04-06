@@ -238,7 +238,7 @@ function wer_render_tool_rankings($atts) {
 
         <div class="wer-title">
             <h2>🏆 AI Tools Rankings - Word Error Rate</h2>
-            <p>Top 10 tools ranked by lowest average WER (Lower is Better)</p>
+            <p>Current Month Rankings - Top 10 tools ranked by lowest average WER</p>
         </div>
 
         <div class="wer-controls">
@@ -267,7 +267,7 @@ function wer_render_tool_rankings($atts) {
         </div>
 
         <div class="wer-footer">
-            <p>Top 10 AI Tools Rankings - Aggregated Across All Months</p>
+            <p>Data from Current Month (or Previous Month if not available)</p>
         </div>
     </div>
 
