@@ -1,8 +1,13 @@
 app = "wer-automation-api"
 primary_region = "iad"
 
+# Deploy from api branch
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "Dockerfile.prod"
+  
+[build.args]
+  # Use optimized requirements for production
+  
 
 [env]
   PYTHONUNBUFFERED = "true"

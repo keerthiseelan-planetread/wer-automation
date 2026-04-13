@@ -1,0 +1,20 @@
+FROM python:3.12.9-slim
+
+WORKDIR /app
+
+# Install only production dependencies
+COPY requirements.prod.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy only necessary code
+COPY backend/ ./backend/
+COPY app/database/ ./app/database/
+COPY app/config.py ./app/
+COPY app/__init__.py ./app/
+COPY app/health_check.py ./app/
+
+# Expose port
+EXPOSE 8000
+
+# Run FastAPI only
+CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
