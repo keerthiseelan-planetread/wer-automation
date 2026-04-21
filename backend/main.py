@@ -111,7 +111,7 @@ def get_tool_summary_metrics_api(language: str):
     Auto-detects current month and fetches data.
     If no data for current month, falls back to previous month.
     
-    Example: /api/wer/get-tool-summary-metrics?language=hi
+    Example: /api/wer/get-tool-summary-metrics?language=Hindi
     """
     try:
         from app.database.mongo_connection import get_database
@@ -120,6 +120,9 @@ def get_tool_summary_metrics_api(language: str):
         
         db = get_database()
         col = db[Config.MONGODB_COLLECTIONS["tool_summary_metrics"]]
+        
+        # Normalize language name (capitalize first letter, lowercase rest)
+        language = language.capitalize()
         
         # Get current month and year
         now = datetime.now()
