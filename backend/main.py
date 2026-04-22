@@ -109,7 +109,8 @@ def get_tool_summary_metrics_api(language: str):
     """
     Get tool summary metrics for selected language.
     Auto-detects current month and fetches data.
-    If no data for current month, falls back to previous month.
+    If no data for current month, searches backwards through previous months
+    until the latest available data is found (up to 13 months back).
     Uses case-insensitive language search for better matching.
     
     Example: /api/wer/get-tool-summary-metrics?language=Hindi
@@ -119,39 +120,43 @@ def get_tool_summary_metrics_api(language: str):
         from app.config import Config
         from datetime import datetime, timedelta
         
+        def get_previous_month(date):
+            """Get the first day of the previous month"""
+            first_of_current = date.replace(day=1)
+            last_of_previous = first_of_current - timedelta(days=1)
+            return last_of_previous.replace(day=1)
+        
         db = get_database()
         col = db[Config.MONGODB_COLLECTIONS["tool_summary_metrics"]]
         
         # Get current month and year
         now = datetime.now()
-        current_month = now.strftime("%B")  # e.g., "April"
-        current_year = now.year  # e.g., 2026
+        doc = None
+        search_date = now
         
-        # Try to fetch current month data with case-insensitive language search
-        doc = col.find_one({
-            "language": {"$regex": f"^{language}$", "$options": "i"},  # Case-insensitive
-            "year": current_year,
-            "month": current_month
-        }, {"_id": 0})
-        
-        # If no current month data, try previous month
-        if not doc:
-            # Go back one month
-            previous_date = now - timedelta(days=30)
-            previous_month = previous_date.strftime("%B")
-            previous_year = previous_date.year
+        # Loop backwards to find the latest available data (up to 13 months back)
+        for _ in range(13):
+            search_month = search_date.strftime("%B")
+            search_year = search_date.year
             
             doc = col.find_one({
                 "language": {"$regex": f"^{language}$", "$options": "i"},  # Case-insensitive
-                "year": previous_year,
-                "month": previous_month
+                "year": search_year,
+                "month": search_month
             }, {"_id": 0})
+            
+            if doc:
+                # Found data, stop searching
+                break
+            
+            # Move to previous month
+            search_date = get_previous_month(search_date)
         
-        # If still no data found
+        # If no data found after searching 13 months back
         if not doc:
             return {
                 "status": "warning",
-                "message": f"No metrics found for {language} in current or previous month",
+                "message": f"No metrics found for {language} in the last 13 months",
                 "data": {}
             }
         
