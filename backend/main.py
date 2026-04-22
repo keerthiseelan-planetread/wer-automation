@@ -160,12 +160,31 @@ def get_tool_summary_metrics_api(language: str):
                 "data": {}
             }
         
-        # Return the tool metrics
+        # Get tool metrics and sort by avg_wer (lower WER = higher rank)
         tool_metrics = doc.get("tool_metrics", {})
+        
+        # Convert to list of tuples and sort by avg_wer (ascending)
+        sorted_tools = sorted(
+            tool_metrics.items(),
+            key=lambda x: x[1].get("avg_wer", float('inf'))
+        )
+        
+        # Create ranked data structure
+        ranked_data = []
+        for rank, (tool_name, metrics) in enumerate(sorted_tools, start=1):
+            ranked_data.append({
+                "rank": rank,
+                "tool": tool_name,
+                "avg_wer": metrics.get("avg_wer"),
+                "total_evaluations": metrics.get("total_evaluations")
+            })
         
         return {
             "status": "success",
-            "data": tool_metrics
+            "month": doc.get("month"),
+            "year": doc.get("year"),
+            "language": doc.get("language"),
+            "data": ranked_data
         }
 
     except Exception as e:
