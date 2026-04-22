@@ -104,6 +104,61 @@ def save_tool_summary_metrics_api(request: ToolMetricsRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# DEBUG ENDPOINT - Check raw data structure
+@app.get("/api/wer/debug-tool-metrics")
+def debug_tool_metrics_api(language: str):
+    """Debug endpoint to see raw MongoDB structure for tool_metrics"""
+    try:
+        from app.database.mongo_connection import get_database
+        from app.config import Config
+        from datetime import datetime, timedelta
+        
+        def get_previous_month(date):
+            first_of_current = date.replace(day=1)
+            last_of_previous = first_of_current - timedelta(days=1)
+            return last_of_previous.replace(day=1)
+        
+        db = get_database()
+        col = db[Config.MONGODB_COLLECTIONS["tool_summary_metrics"]]
+        
+        now = datetime.now()
+        doc = None
+        search_date = now
+        
+        for _ in range(13):
+            search_month = search_date.strftime("%B")
+            search_year = search_date.year
+            
+            doc = col.find_one({
+                "language": {"$regex": f"^{language}$", "$options": "i"},
+                "year": search_year,
+                "month": search_month
+            }, {"_id": 0})
+            
+            if doc:
+                break
+            search_date = get_previous_month(search_date)
+        
+        if not doc:
+            return {"error": "No data found"}
+        
+        tool_metrics = doc.get("tool_metrics", {})
+        
+        # Show first tool's structure
+        if tool_metrics:
+            first_tool = list(tool_metrics.items())[0]
+            return {
+                "raw_structure": first_tool,
+                "type_of_value": str(type(first_tool[1])),
+                "all_tools_count": len(tool_metrics)
+            }
+        
+        return {"error": "No tool_metrics found"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/wer/get-tool-summary-metrics")
 def get_tool_summary_metrics_api(language: str):
     """
@@ -241,5 +296,5 @@ def get_tool_summary_metrics_api(language: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8080)
 
