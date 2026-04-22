@@ -169,14 +169,13 @@ def get_tool_summary_metrics_api(language: str):
             key=lambda x: x[1].get("avg_wer", float('inf'))
         )
         
-        # Create ranked data structure
+        # Create ranked data structure (only rank, tool name, and avg WER)
         ranked_data = []
         for rank, (tool_name, metrics) in enumerate(sorted_tools, start=1):
             ranked_data.append({
                 "rank": rank,
                 "tool": tool_name,
-                "avg_wer": metrics.get("avg_wer"),
-                "total_evaluations": metrics.get("total_evaluations")
+                "avg_wer": metrics.get("avg_wer")
             })
         
         return {
