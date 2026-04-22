@@ -164,18 +164,21 @@ def get_tool_summary_metrics_api(language: str):
         tool_metrics = doc.get("tool_metrics", {})
         
         # Convert to list of tuples and sort by avg_wer (ascending)
+        # Handle both structures: direct values or nested with avg_wer key
         sorted_tools = sorted(
             tool_metrics.items(),
-            key=lambda x: x[1].get("avg_wer", float('inf'))
+            key=lambda x: x[1] if isinstance(x[1], (int, float)) else x[1].get("avg_wer", float('inf'))
         )
         
         # Create ranked data structure (only rank, tool name, and avg WER)
         ranked_data = []
         for rank, (tool_name, metrics) in enumerate(sorted_tools, start=1):
+            # Handle both direct values and nested objects
+            avg_wer_value = metrics if isinstance(metrics, (int, float)) else metrics.get("avg_wer")
             ranked_data.append({
                 "rank": rank,
                 "tool": tool_name,
-                "avg_wer": metrics.get("avg_wer")
+                "avg_wer": avg_wer_value
             })
         
         return {
