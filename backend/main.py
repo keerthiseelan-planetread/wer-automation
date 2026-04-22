@@ -110,6 +110,7 @@ def get_tool_summary_metrics_api(language: str):
     Get tool summary metrics for selected language.
     Auto-detects current month and fetches data.
     If no data for current month, falls back to previous month.
+    Uses case-insensitive language search for better matching.
     
     Example: /api/wer/get-tool-summary-metrics?language=Hindi
     """
@@ -121,17 +122,14 @@ def get_tool_summary_metrics_api(language: str):
         db = get_database()
         col = db[Config.MONGODB_COLLECTIONS["tool_summary_metrics"]]
         
-        # Normalize language name (capitalize first letter, lowercase rest)
-        language = language.capitalize()
-        
         # Get current month and year
         now = datetime.now()
         current_month = now.strftime("%B")  # e.g., "April"
         current_year = now.year  # e.g., 2026
         
-        # Try to fetch current month data
+        # Try to fetch current month data with case-insensitive language search
         doc = col.find_one({
-            "language": language,
+            "language": {"$regex": f"^{language}$", "$options": "i"},  # Case-insensitive
             "year": current_year,
             "month": current_month
         }, {"_id": 0})
@@ -144,7 +142,7 @@ def get_tool_summary_metrics_api(language: str):
             previous_year = previous_date.year
             
             doc = col.find_one({
-                "language": language,
+                "language": {"$regex": f"^{language}$", "$options": "i"},  # Case-insensitive
                 "year": previous_year,
                 "month": previous_month
             }, {"_id": 0})
@@ -218,3 +216,4 @@ def get_tool_summary_metrics_api(language: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
