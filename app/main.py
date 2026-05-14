@@ -496,7 +496,7 @@ st.markdown("""
 
 # --- Dropdown Options ---
 languages = ["English", "Hindi", "Punjabi", "Tamil"]
-years = ["2022", "2023", "2024", "2025"]
+years = ["2022", "2023", "2024", "2025", "2026"]
 months = [
     "January", "February", "March", "April",
     "May", "June", "July", "August",
